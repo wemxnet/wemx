@@ -19,9 +19,9 @@ Route::group(['prefix' => 'users'], function () {
 });
 
 Route::group(['prefix' => 'roles'], function () {
-    Route::get('/', [Admin\RolesController::class, 'index'])->name('roles.index');
-    Route::get('/create', [Admin\RolesController::class, 'create'])->name('roles.create');
-    Route::get('/edit/{role:id}', [Admin\RolesController::class, 'edit'])->name('roles.edit');
+    Route::get('/', [Admin\RolesController::class, 'index'])->name('roles.index')->middleware('permission:admin.roles');
+    Route::get('/create', [Admin\RolesController::class, 'create'])->name('roles.create')->middleware('permission:admin.roles.create');
+    Route::get('/edit/{role:id}', [Admin\RolesController::class, 'edit'])->name('roles.edit')->middleware('permission:admin.roles.update');
 });
 
 Route::group(['prefix' => 'payments'], function () {

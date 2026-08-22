@@ -21,6 +21,18 @@ new class extends Component {
 
     public function mount($role)
     {
+        abort_if(!auth()->user()->hasPerm('admin.roles.update'), 403);
+
+        abort_if(
+            !auth()->user()->isPrimaryAdmin()
+            && \App\Models\RoleUser::query()
+                ->where('user_id', auth()->id())
+                ->where('role_id', $role->id)
+                ->exists(),
+            403,
+            'You cannot modify a role assigned to you.'
+        );
+
         $this->role = $role;
         $this->name = $role->name;
         $this->description = $role->description;
@@ -70,6 +82,8 @@ new class extends Component {
 
     public function updateRole()
     {
+        abort_if(!auth()->user()->hasPerm('admin.roles.update'), 403);
+
         $this->resetErrorBag();
 
         RoleActions::updateRoleAsAdmin([
@@ -129,19 +143,21 @@ new class extends Component {
                     @enderror
             </div>
         </div>
-        <div class="mb-3 row">
-            <label class="col-3 col-form-label" for="all_permissions-input">Full Access</label>
-            <div class="col">
-                <label class="form-check form-switch">
-                    <input class="form-check-input" wire:model.change="all_permissions" id="all_permissions-input"
-                           type="checkbox"/>
-                    <span class="form-check-label">Does this role have all permissions</span>
-                </label>
-                @error('super_admin')
-                <x-admin::form.error :message="$message"/>
-                @enderror
+        @if(auth()->user()->isPrimaryAdmin())
+            <div class="mb-3 row">
+                <label class="col-3 col-form-label" for="all_permissions-input">Full Access</label>
+                <div class="col">
+                    <label class="form-check form-switch">
+                        <input class="form-check-input" wire:model.change="all_permissions" id="all_permissions-input"
+                               type="checkbox"/>
+                        <span class="form-check-label">Does this role have all permissions</span>
+                    </label>
+                    @error('super_admin')
+                    <x-admin::form.error :message="$message"/>
+                    @enderror
+                </div>
             </div>
-        </div>
+        @endif
         @if(!$all_permissions)
             <div class="mb-3 row">
                 <label class="col-3 col-form-label required" for="permissions-input">Permissions</label>
@@ -157,6 +173,7 @@ new class extends Component {
                                     <strong class="text-uppercase">{{ $permissionGroupName }}</strong>
                                 </div>
                                 @foreach($permissionGroup as $permission => $description)
+                                    @continue(!auth()->user()->isPrimaryAdmin() && !auth()->user()->hasPermission($permission))
                                     <div class="mb-2 col-4">
                                         <div class="form-label">{{ $permission }} @if(in_array($permission, $inheritedPermissions)) (Parent) @endif</div>
                                         <label class="form-check form-switch"

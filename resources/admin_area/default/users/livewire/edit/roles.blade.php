@@ -78,7 +78,13 @@ new class extends Component
                 <tbody>
                 @foreach($user->roles as $role)
                 <tr>
-                    <td><a href="{{ route('admin.roles.edit', $role->role_id) }}" class="text-reset">{{ $role->role->name }}</a></td>
+                    <td>
+                        @perm('admin.roles.update')
+                            <a href="{{ route('admin.roles.edit', $role->role_id) }}" class="text-reset">{{ $role->role->name }}</a>
+                        @else
+                            {{ $role->role->name }}
+                        @endperm
+                    </td>
                     <td class="text-secondary">
                         {{ Str::limit($role->role->description ?? '-', 50) }}
                     </td>
