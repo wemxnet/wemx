@@ -112,6 +112,7 @@ Route::group(['prefix' => 'license'], function () {
 Route::group(['prefix' => 'images'], function () {
     Route::get('/', [Admin\ImagesController::class, 'index'])->name('images.index');
     Route::post('/upload', [Admin\ImagesController::class, 'upload'])->name('images.upload');
+    Route::delete('/delete/{file_name}', [Admin\ImagesController::class, 'destroy'])->name('images.delete');
 });
 
 Route::group(['prefix' => 'taxes'], function () {

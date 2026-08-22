@@ -71,6 +71,11 @@
                         <a href="#" class="btn btn-secondary" onclick="navigator.clipboard.writeText('{{ $image }}'); this.innerText='Copied!'; setTimeout(() => { this.innerText='Copy URL'; }, 2000); return false;">
                             Copy URL
                         </a>
+                        <form action="{{ route('admin.images.delete', ['file_name' => basename($image)]) }}" method="POST" style="display:inline-block;">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Sicher löschen?')">Delete</button>
+                        </form>
                     </div>
                 </div>
             </div>

@@ -37,4 +37,16 @@ class ImagesController extends Controller
 
         return redirect()->back();
     }
+
+    public function destroy($file_name)
+    {
+        $filePath = public_path('assets/common/img/' . $file_name);
+
+        if (file_exists($filePath)) {
+            unlink($filePath);
+            return redirect()->back()->with('success', 'Image deleted successfully.');
+        }
+
+        return redirect()->back()->with('error', 'Image not found.');
+    }
 }
