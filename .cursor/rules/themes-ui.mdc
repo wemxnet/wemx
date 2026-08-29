@@ -1,0 +1,44 @@
+---
+description: Admin/client theme views, Volt SFCs, routes, and assets
+globs: resources/admin_area/**/*,resources/client_area/**/*,resources/invoices/**/*,resources/email_templates/**/*,routes/**/*.php,app/Livewire/**/*.php
+alwaysApply: false
+---
+
+# Themes, Volt UI & Routes
+
+## View namespaces (not `resources/views`)
+
+| Area | Path | Namespace | Helper |
+| --- | --- | --- | --- |
+| Client | `resources/client_area/{theme}/` | `theme::` | `client_view()`, `client_view_path()` |
+| Admin | `resources/admin_area/{admin_theme}/` | `admin::` | `admin_view()`, `admin_view_path()` |
+| Email | `resources/email_templates/{email_theme}/` | `email::` | — |
+| Invoices | `resources/invoices/` | `invoices::` | — |
+
+Themes come from `config/app.php` (`theme`, `admin_theme`); default folder is `default`.
+
+## Volt (preferred Livewire)
+
+- Create **single-file** Volt components colocated in the theme, e.g. `resources/client_area/default/cart/livewire/view-cart.blade.php`.
+- Pattern: `new class extends Component { ... }` then Blade markup in the same file.
+- Mount with `@livewire(client_view_path('…'))` or `admin_view_path('…')` — not stock `resources/views/livewire`.
+- Call `Model::actions()` from Volt methods; keep validation/errors user-facing.
+- Activate `volt-development` + `livewire-development` skills when editing these files.
+- Use Tailwind (not Bootstrap) unless the surrounding theme already uses something else.
+
+## Routes
+
+- Client: `routes/web.php` — names like `dashboard`, `cart`, `orders.view`, `payments.pay`.
+- Admin: `routes/admin.php` — auto prefix `admin`, name `admin.*`, middleware `web,auth,admin,…`.
+- Auth: `routes/auth.php` — prefix `auth`.
+- Protect admin mutations with `middleware('permission:admin.…')` and Blade `@perm` / `@endperm`.
+
+## Assets
+
+- Client/admin static assets are published via `vendor:publish --tag=client` / `--tag=admin` (also on Composer dump). After theme CSS/JS changes, publish or ask the user to run build/`composer` scripts.
+- Local URL via Herd: `http://wemx.test` (folder name).
+
+## Layouts
+
+- Extend `theme::layouts.wrapper` or `admin::layouts.wrapper`.
+- Reuse Blade components under `resources/*/default/components/` as `<x-theme::…>` / admin equivalents before creating new ones.

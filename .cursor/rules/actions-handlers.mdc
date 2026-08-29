@@ -1,0 +1,40 @@
+---
+description: Actions and Handlers patterns for domain mutations and payment side effects
+globs: app/Actions/**/*.php,app/Handlers/**/*.php,app/Models/**/*.php
+alwaysApply: false
+---
+
+# Actions & Handlers
+
+`app/Services/` is NOT the domain layer (only release/export utilities). Domain work lives in Actions and Handlers.
+
+## Actions (`app/Actions/*Actions.php`)
+
+- Extend `App\Actions\Action`.
+- Validate with `Validator::make(...)->validate()` (or Form Requests in HTTP controllers).
+- Use `self::omitNullValues($data)` before create/update so null optionals do not wipe fields.
+- Prefer instance methods when called via `Model::actions()`; static helpers OK for simple creates.
+- Throw `ValidationException` for business-rule failures the UI should show.
+
+```php
+Cart::actions()->checkoutAsClient([...]);
+Order::actions()->someMethod([...]);
+```
+
+Wire new Actions on the model with an `actions()` method returning `new FooActions` (follow existing models).
+
+## Handlers (`app/Handlers/`)
+
+- Invoked from `Payment::completed()` (and similar) via a stored `handler` class string + method like `onPaymentCompleted(Payment $payment)`.
+- Known patterns: `CartCompletedHandler`, `Handlers\Cart\PackagePurchasedHandler`, `OrderRenewalHandler`, `BalanceTopupHandler`, `Handlers\Subscriptions\*`.
+- Handlers orchestrate model methods / nested handlers — keep gateway/server API calls in Extensions.
+
+## Events vs handlers
+
+- Models may `$dispatchesEvents` for lifecycle; domain completion usually runs through **handlers**, not Event listeners (`EventServiceProvider` is largely empty).
+- Queued provisioning: `app/Jobs/Orders/Order*Server` — dispatch from Order methods, do not block HTTP on panel APIs.
+
+## Controllers
+
+- Slim: authorize/permission middleware + call Actions or return theme views.
+- Inject a Service into a method only if used once; constructor if used in multiple methods (project PHP rule). Prefer Actions over inventing new Services for billing/catalog.

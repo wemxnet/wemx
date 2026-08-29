@@ -1,44 +1,34 @@
-## General code instructions
- 
-- Don't generate code comments above the methods or code blocks if they are obvious. Generate comments only for something that needs extra explanation for the reasons why that code was written
- 
 ---
- 
-## PHP instructions
- 
-- In PHP, use `match` operator over `switch` whenever possible
-- Use PHP 8 constructor property promotion. Don't create an empty Constructor method if it doesn't have any parameters.
-- Using Services in Controllers: if Service class is used only in ONE method of Controller, inject it directly into that method with type-hinting. If Service class is used in MULTIPLE methods of Controller, initialize it in Constructor.
-- Use return types in functions whenever possible, adding the full path to classname to the top in `use` section
- 
+description: Core PHP/Laravel coding standards for the WemX codebase
+alwaysApply: true
 ---
- 
-## Laravel instructions
- 
-- For DB pivot tables, use correct alphabetical order, like "project_role" instead of "role_project"
-- I am using Laravel Herd locally, so always assume that the main URL of the project is `http://[folder_name].test`
-- **Eloquent Observers** should be registered in Eloquent Models with PHP Attributes, and not in AppServiceProvider. Example: `#[ObservedBy([UserObserver::class])]` with `use Illuminate\Database\Eloquent\Attributes\ObservedBy;` on top
-- When generating Controllers, put validation in Form Request classes
-- Aim for "slim" Controllers and put larger logic pieces in Service classes
-- Use Laravel helpers instead of `use` section classes whenever possible. Examples: use `auth()->id()` instead of `Auth::id()` and adding `Auth` in the `use` section. Another example: use `redirect()->route()` instead of `Redirect::route()`.
- 
----
- 
-## Use Laravel 11+ skeleton structure
- 
-- **Service Providers**: there are no other service providers except AppServiceProvider. Don't create new service providers unless absolutely necessary. Use Laravel 11+ new features, instead. Or, if you really need to create a new service provider, register it in `bootstrap/providers.php` and not `config/app.php` like it used to be before Laravel 11.
-- **Event Listeners**: since Laravel 11, Listeners auto-listen for the events if they are type-hinted correctly.
-- **Console Scheduler**: scheduled commands should be in `routes/console.php` and not `app/Console/Kernel.php` which doesn't exist since Laravel 11.
-- **Middleware**: whenever possible, use Middleware by class name in the routes. But if you do need to register Middleware alias, it should be registered in `bootstrap/app.php` and not `app/Http/Kernel.php` which doesn't exist since Laravel 11.
-- **Tailwind**: in new Blade pages, use Tailwind and not Bootstrap, unless instructed otherwise in the prompt. Tailwind is already pre-configured since Laravel 11, with Vite.
-- **Faker**: in Factories, use `fake()` helper instead of `$this->faker`.
-- **Policies**: Laravel automatically auto-discovers Policies, no need to register them in the Service Providers.
- 
----
- 
-## Livewire Instructions
 
-- This project uses Laravel Livewire with the Livewire volt package.
-- Livewire Volt is a library for livewire that allows you to create single-file Livewire components where the php code and html are in the same file.
-- Whenever creating Livewire components, ensure that you create them as single-file components
- 
+# Project coding standards
+
+## General
+
+- Do not add obvious comments. Comment only non-obvious intent or constraints.
+- Follow sibling files for structure and naming; prefer reuse over new abstractions.
+- Run `vendor/bin/pint --dirty --format agent` after PHP edits.
+- Prefer feature tests (`php artisan make:test --phpunit`) over one-off tinker scripts. Factories beyond `UserFactory` often need creating from scratch — mirror Action validation when testing.
+
+## PHP
+
+- Prefer `match` over `switch`.
+- Use constructor property promotion; omit empty constructors.
+- Declare return types; import classes with `use` (do not FQCN inline unless matching nearby style).
+- Use Laravel helpers when available: `auth()->id()`, `redirect()->route()`, `fake()` in factories — not Facade imports solely for those calls.
+
+## Laravel structure (v11+/v12)
+
+- No new service providers unless necessary; register in `bootstrap/providers.php`.
+- Schedule in `routes/console.php`. Middleware aliases in `bootstrap/app.php`. Reference middleware by class on routes when possible.
+- Form Requests for controller validation; slim controllers; domain logic in Actions (see actions-handlers rule).
+- Pivot table names: alphabetical (`project_role`, not `role_project`).
+- Policies are auto-discovered.
+- Eloquent lifecycle: this app uses `$dispatchesEvents`, model `booted`, and payment **handlers** — not attribute-based Observers. Prefer those existing patterns for billing side effects.
+- Local URL (Herd): `http://wemx.test`.
+
+## Livewire / Volt
+
+- New Livewire UI must be **Volt single-file components** inside the admin/client theme trees (see themes-ui rule), not class components under `app/Livewire` unless matching an existing exception.

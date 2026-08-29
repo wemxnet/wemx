@@ -1,0 +1,50 @@
+---
+description: WemX product domain vocabulary and feature architecture for this billing SaaS
+alwaysApply: true
+---
+
+# WemX Domain Model
+
+WemX is a SaaS billing & automation platform for businesses selling digital services (hosting, game servers, software, etc.). Clients buy packages, pay invoices, and manage provisioned services.
+
+## Vocabulary (do not invent alternate names)
+
+| Business concept | Model / term | Do NOT call it |
+| --- | --- | --- |
+| Sellable product / plan | `Package` (+ `PackagePrice`, `PackageFeature`, `PackageConfigOption`) | Product, Plan SKU |
+| Catalog grouping | `Category` | — |
+| Customer service / subscription instance | `Order` | Service, Subscription (alone) |
+| Invoice / charge | `Payment` (`invoice_id` string) | Invoice model |
+| Checkout basket | `Cart` → `CartItem` → frozen `CartOrderItem` | — |
+| Payment method instance | `GatewayConfig` | Gateway model alone |
+| Provisioning target | `Server` / `ServerConnection` / `ServerAccount` | — |
+| Recurring gateway subscription | `Subscription` (+ `OrderSubscription`) | — |
+
+Order statuses: `pending`, `processing`, `active`, `suspended`, `terminated`.  
+Payment statuses: `unpaid`, `paid`, `refunded`.
+
+## Feature architecture (required flow)
+
+```
+UI (Volt in theme) → Actions (validate + persist) → Models
+                         ↓
+              Payment / CartOrderItem `handler` class
+                         ↓
+              Jobs → Extensions\ (Gateways | Servers | Modules)
+```
+
+1. Put business mutations in `app/Actions/*Actions.php`, exposed via `Model::actions()`.
+2. Put post-payment / post-purchase side effects in `app/Handlers/`, referenced as a handler class string on the Payment or CartOrderItem.
+3. Put payment processors and server panels in `extensions/Gateways|Servers|Modules/` under namespace `Extensions\`.
+4. Keep controllers and Volt components thin — call Actions, do not reimplement checkout/provisioning.
+
+## Money & tax
+
+- Persist amounts with high precision (`decimal:8` casts). Display with `price()` / `priceIn()` helpers.
+- Create taxable payments via `Payment::createWithTax(...)`; tax via `App\Facades\Tax` (plain helper class, not a Laravel Facade).
+
+## Before implementing a feature
+
+1. Find a sibling feature (similar Action, Volt SFC, or extension) and mirror its structure.
+2. Reuse helpers: `settings()`, `cart()`, `admin_view()` / `client_view()`, `admin_view_path()` / `client_view_path()`.
+3. Do not add new top-level folders or Composer dependencies without approval.

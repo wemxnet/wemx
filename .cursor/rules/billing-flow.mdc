@@ -1,0 +1,37 @@
+---
+description: Cart, checkout, payments, orders, renewals, and provisioning flow
+globs: app/Actions/Cart*.php,app/Actions/Payment*.php,app/Actions/Order*.php,app/Actions/Subscription*.php,app/Handlers/**/*.php,app/Jobs/Orders/**/*.php,app/Models/{Cart,CartItem,CartOrderItem,Order,Payment,Subscription,Package}*.php,extensions/Gateways/**/*.php
+alwaysApply: false
+---
+
+# Billing, Cart & Provisioning
+
+## Happy path
+
+```
+PackagePrice → CartItem
+  → CartActions::checkoutAsClient
+  → CartOrderItem (snapshot, handler = PackagePurchasedHandler)
+  → Payment::createWithTax (handler = CartCompletedHandler)
+  → GatewayExtension::pay / webhook
+  → Payment::completed()
+  → CartCompletedHandler → CartOrderItem::completed()
+  → PackagePurchasedHandler → Order (pending)
+  → Order::createServer() → Job OrderCreateServer
+  → ServerExtension::create → Order active + OrderActivated
+```
+
+## Implementing related features
+
+- **Checkout / cart changes** → extend `CartActions`; do not bypass tax (`Payment::createWithTax`) or handler assignment.
+- **New payable product type** → new CartOrderItem handler (like `PackagePurchasedHandler`) + register handler class on the item; still complete via Payment handler chain.
+- **Renewals / balance** → follow `OrderRenewalHandler`, `BalanceTopupHandler`, subscription handlers under `app/Handlers/Subscriptions/`.
+- **Gateway** → `extensions/Gateways/...` extending `GatewayExtension` or `SubscriptionGatewayExtension`; mark Payment paid only through the same completion path siblings use.
+- **Provisioning** → `ServerExtension` methods + queue jobs under `app/Jobs/Orders/`; cron suspend/terminate lives in `app/Console/Commands/Cronjobs/*` scheduled from `routes/console.php`.
+
+## Safety
+
+- Never mark a Payment `paid` from a Volt component without going through gateway confirmation / `Payment::completed()`.
+- Preserve polymorphic `payable` / cartable relations; checkout freezes prices into `CartOrderItem` so catalog edits do not rewrite historical charges.
+- Respect `LicensePlanLimits` and existing permission checks on admin order/payment tools.
+- Guest checkout may create the User inside `CartActions` — do not duplicate registration elsewhere in the same flow.

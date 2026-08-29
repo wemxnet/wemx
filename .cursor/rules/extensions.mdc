@@ -1,0 +1,45 @@
+---
+description: Building Gateways, Servers, and Modules under the Extensions system
+globs: extensions/**/*.php,app/Extensions/**/*.php
+alwaysApply: false
+---
+
+# Extensions (Gateways, Servers, Modules)
+
+## Layout & namespace
+
+```
+extensions/Gateways/{Name}/Gateway.php  → Extensions\Gateways\{Name}\Gateway
+extensions/Servers/{Name}/Server.php    → Extensions\Servers\{Name}\Server
+extensions/Modules/{Name}/...           → Extensions\Modules\{Name}\...
+```
+
+Composer maps `Extensions\` → `extensions/`. Optional per-extension: views, lang, routes, migrations, config — loaded when the extension is **enabled** in the `extensions` table (`ExtensionServiceProvider`).
+
+## Base classes (`app/Extensions/Foundation/`)
+
+| Type | Extend | Must implement |
+| --- | --- | --- |
+| One-off payment gateway | `GatewayExtension` | `pay(Payment $payment, GatewayConfig $gatewayConfig)` |
+| Recurring gateway | `SubscriptionGatewayExtension` | subscription pay/manage contract |
+| Server panel | `ServerExtension` | `create/suspend/unsuspend/terminate(Order, ServerConnection)` + config hooks |
+| Generic module | `ModuleExtension` | module-specific hooks |
+
+Use Artisan makers under `app/Extensions/Commands/` (`MakeServerCommand`, `MakeModuleCommand`, etc.) when scaffolding.
+
+## Eloquent vs runtime class
+
+- `App\Models\Extension` (and scoped `Gateway` / `Server` / `Module`) store registry rows (`identifier`, `namespace`, `type`, `status`).
+- Runtime configs: `GatewayConfig`, `ServerConnection` — not the extension class itself.
+- Call through models: `$gateway->extension()->pay(...)`, `$order->serverMethods()->create(...)`.
+
+## Webhooks & CSRF
+
+- Gateway webhook/callback routes must stay under paths exempt from CSRF (`gateways/webhooks/*`, `gateways/callbacks/*` in `bootstrap/app.php`).
+- Log/inspect with existing webhook log models where applicable; never trust webhook payloads without signature/verification patterns used by sibling gateways.
+
+## Rules of thumb
+
+- Mirror `extensions/Gateways/StripeCheckout` or `extensions/Servers/Pterodactyl` rather than inventing a new layout.
+- Do not put panel/API HTTP clients in Actions — keep them inside the extension.
+- After install/enable, ensure DB row + `config('app.installed')` so the provider loads the extension.
