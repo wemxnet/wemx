@@ -2,10 +2,11 @@
 
 namespace App\Extensions;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Volt\Volt;
 
 class ExtensionServiceProvider extends ServiceProvider
 {
@@ -48,6 +49,7 @@ class ExtensionServiceProvider extends ServiceProvider
 
                 if ($extensionClass->hasViews()) {
                     $this->loadViewsFrom($extensionClass->getViewsPath(), $extensionClass->getId());
+                    Volt::mount($extensionClass->getViewsPath());
                 }
 
                 if ($extensionClass->hasTranslations()) {
@@ -65,13 +67,23 @@ class ExtensionServiceProvider extends ServiceProvider
                 if ($extensionClass->hasConfig()) {
                     $this->mergeConfigFrom($extensionClass->getConfigPath(), $extensionClass->getId());
                 }
+
+                if (method_exists($extensionClass, 'commands')) {
+                    $this->commands($extensionClass->commands());
+                }
+
+                if (method_exists($extensionClass, 'schedule')) {
+                    $this->callAfterResolving(Schedule::class, function (Schedule $schedule) use ($extensionClass) {
+                        $extensionClass->schedule($schedule);
+                    });
+                }
             }
         }
     }
 
     private function getExtensionNamespaces(): array
     {
-        if (!Schema::hasTable('extensions')) {
+        if (! Schema::hasTable('extensions')) {
             return [];
         }
 

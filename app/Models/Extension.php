@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Extensions\Foundation\ExtensionFoundation;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -67,18 +67,21 @@ class Extension extends Model
         if (method_exists($this->extension(), 'elements')) {
             $elements = $this->extension()->elements();
 
-            if (!is_array($elements)) {
+            if (! is_array($elements)) {
                 throw new \Exception('Extension elements must be an array');
             }
 
             foreach ($elements as $element) {
-               ExtensionElement::create([
-                    'extension_identifier' => $this->identifier,
-                    'element' => $element['element'],
-                    'view' => $element['view'] ?? null,
-                    'permission' => $element['permission'] ?? null,
-                    'attributes' => $element['attributes'] ?? [],
-                ]);
+                $this->elements()->firstOrCreate(
+                    [
+                        'element' => $element['element'],
+                        'view' => $element['view'] ?? null,
+                    ],
+                    [
+                        'permission' => $element['permission'] ?? null,
+                        'attributes' => $element['attributes'] ?? [],
+                    ]
+                );
             }
         }
 
@@ -126,20 +129,20 @@ class Extension extends Model
 
                 foreach ($extensions as $extensionDirectory) {
                     $extensionName = basename($extensionDirectory);
-                    $extensionClass = 'Extensions\\' . $namespace . '\\' . $extensionName . '\\' . Str::singular($namespace);
+                    $extensionClass = 'Extensions\\'.$namespace.'\\'.$extensionName.'\\'.Str::singular($namespace);
 
                     if (class_exists($extensionClass)) {
                         try {
-                            $extension = new $extensionClass();
+                            $extension = new $extensionClass;
                             // check if extensions extends ModuleInterface
-                            if (!($extension instanceof \App\Extensions\Foundation\ExtensionFoundation)) {
+                            if (! ($extension instanceof ExtensionFoundation)) {
                                 continue;
                             }
 
                             Extension::updateOrCreate(
                                 [
                                     'namespace' => $extensionClass,
-                                    'identifier' => $extension->getId()
+                                    'identifier' => $extension->getId(),
                                 ],
                                 [
                                     'marketplace_id' => $extension->getMarketplaceId(),
@@ -149,7 +152,7 @@ class Extension extends Model
                                 ]
                             );
                         } catch (\Exception $e) {
-                            logs()->error("Extension class $extensionClass failed to discover: " . $e->getMessage());
+                            logs()->error("Extension class $extensionClass failed to discover: ".$e->getMessage());
                         }
                     }
 
@@ -160,11 +163,11 @@ class Extension extends Model
 
     public function extension(): ExtensionFoundation
     {
-        if(!class_exists($this->namespace)) {
+        if (! class_exists($this->namespace)) {
             $this->delete();
         }
 
-        return (new $this->namespace);
+        return new $this->namespace;
     }
 
     public function functions(): ExtensionFoundation
@@ -175,7 +178,7 @@ class Extension extends Model
     public function scopeSearch($query, string $search): void
     {
         if ($search) {
-            $query->where('name', 'like', '%' . $search . '%');
+            $query->where('name', 'like', '%'.$search.'%');
         }
     }
 

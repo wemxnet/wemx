@@ -94,6 +94,10 @@ new class extends Component
                 @livewire(admin_view_path('orders.livewire.order-action-card'), ['order' => $order])
             </div>
 
+            @foreach(extensionElements(['admin-order-sidebar-view']) as $element)
+                @includeIf($element['view'], ['order' => $order])
+            @endforeach
+
             <div class="card mb-3">
                 <div class="card-header">
                     <h3 class="card-title">Order Members</h3>

@@ -11,6 +11,7 @@ class MigrateExtensions extends Command
     use CommandHelper;
 
     protected $signature = 'extension:migrate {name?}';
+
     protected $description = 'Perform migrations for extensions';
 
     public function handle(): void
@@ -33,9 +34,9 @@ class MigrateExtensions extends Command
 
     protected function migrateExtension($extension): void
     {
-        $migrationPath = $extension->extension()->getExtensionDirectory() . '/migrations';
+        $migrationPath = $extension->extension()->getMigrationsPath();
         if (is_dir($migrationPath)) {
-            $relativePath = str_replace(base_path() . '/', '', $migrationPath);
+            $relativePath = str_replace(base_path().DIRECTORY_SEPARATOR, '', $migrationPath);
             $this->info("Performing migrations for the {$extension->name} at {$relativePath}");
             $this->call('migrate', [
                 '--path' => $relativePath,
@@ -52,7 +53,8 @@ class MigrateExtensions extends Command
     {
         $extensions = $this->extensionClass()->where('status', 'enabled')->get();
         if ($extensions->isEmpty()) {
-            $this->info("No enabled extensions found for migrations.");
+            $this->info('No enabled extensions found for migrations.');
+
             return;
         }
 
