@@ -28,12 +28,6 @@ class AuthActions extends Action
             // notify user on their previous email address
             auth()->user()->email([
                 'identifier' => 'account.new-login',
-                'subject' => 'New login to your account',
-                'lines' => [
-                    'You are receiving this email because there was a new login to your account on '.settings('app_name', 'Application').'.',
-                    'If this was you, you can safely ignore this email.',
-                ],
-                // todo: add more information like ip address, location, browser, os, etc.
             ]);
 
             return;
@@ -138,11 +132,6 @@ class AuthActions extends Action
         // notify the user
         $token->user->email([
             'identifier' => 'account.password.reset',
-            'subject' => 'Your password has been reset',
-            'lines' => [
-                'You are receiving this email because your password was reset on '.settings('app_name', 'Application').'.',
-                'If you did not make this change, please contact support immediately.',
-            ],
         ]);
     }
 
@@ -180,11 +169,6 @@ class AuthActions extends Action
 
         $user->email([
             'identifier' => 'account.2fa.enabled',
-            'subject' => 'Two-factor authentication enabled',
-            'lines' => [
-                'You are receiving this email because two-factor authentication was enabled on your account on '.settings('app_name', 'Application').'.',
-                'If you did not make this change, please contact support immediately.',
-            ],
         ]);
 
         return $user->update([
@@ -233,11 +217,6 @@ class AuthActions extends Action
 
         $user->email([
             'identifier' => 'account.2fa.disabled',
-            'subject' => 'Two-factor authentication disabled',
-            'lines' => [
-                'You are receiving this email because two-factor authentication was disabled on your account on '.settings('app_name', 'Application').'.',
-                'If you did not make this change, please contact support immediately.',
-            ],
         ]);
 
         return $user->update([
@@ -309,14 +288,7 @@ class AuthActions extends Action
             'display' => false,
             'token' => $token,
             'identifier' => 'account.2fa.disable.request',
-            'subject' => 'Two-factor authentication disable request',
-            'lines' => [
-                'You are receiving this email because a request to disable two-factor authentication was made on your account on '.settings('app_name', 'Application').'.',
-                'If you did not make this request, please contact support immediately.',
-                'Click the button below to disable two-factor authentication.',
-            ],
             'button' => [
-                'text' => 'Disable Two-Factor Authentication',
                 'url' => route('lost-access-2fa', ['email_token' => $token]),
             ],
         ]);

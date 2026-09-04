@@ -21,6 +21,7 @@ class TerminateOrdersPastDueDate extends Command
 
         if ($orders->isEmpty()) {
             $this->info('No orders to terminate.');
+
             return;
         } else {
             $this->info("Found {$orders->count()} orders to terminate.");
@@ -49,11 +50,12 @@ class TerminateOrdersPastDueDate extends Command
 
         $adminEmail = User::first()->email;
 
-        Email::create([
+        Email::actions()->sendEmailToAddress([
             'to' => $adminEmail,
-            'subject' => "{$orders->count()} Orders were terminated by the system",
-            'lines' => [
-                "**{$orders->count()} Orders** were terminated because they were **{$gracePeriodInDays} days** past their due date:",
+            'identifier' => 'admin.orders.terminated_batch',
+            'variables' => [
+                'count' => $orders->count(),
+                'grace_period' => $gracePeriodInDays,
             ],
             'table' => [
                 'columns' => [
@@ -69,7 +71,6 @@ class TerminateOrdersPastDueDate extends Command
                     $order->due_date?->toDateString(),
                 ])->toArray(),
             ],
-            'button_text' => 'View Terminated Orders',
             'button_url' => route('admin.orders.index', ['status' => 'terminated']),
         ]);
 

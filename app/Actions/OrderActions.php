@@ -258,31 +258,8 @@ class OrderActions extends Action
 
         // todo: send email notification if email_body is provided
         if (isset($validatedData['email_body']) && ! empty($validatedData['email_body'])) {
-            $order->user->email([
-                'subject' => 'Your order has been extended',
-                'lines' => [
-                    $validatedData['email_body'],
-                ],
-                'table' => [
-                    'columns' => [
-                        'Package',
-                        'Cycle',
-                        'Status',
-                        'Due Date',
-                    ],
-                    'rows' => [
-                        [
-                            $order->package->name,
-                            price($order->price).' / '.$order->cycle(),
-                            ucfirst($order->status),
-                            $order->due_date ? $order->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                        ],
-                    ],
-                ],
-                'button' => [
-                    'text' => 'View Order',
-                    'url' => route('orders.view', ['order' => $order->id]),
-                ],
+            $order->sendOrderEmail('order.extended', [
+                'message' => $validatedData['email_body'],
             ]);
         }
 
@@ -330,29 +307,15 @@ class OrderActions extends Action
         ]);
 
         if (isset($validatedData['email_body']) && ! empty($validatedData['email_body'])) {
-            $order->user->email([
-                'subject' => 'You now have access to this order',
-                'lines' => [
-                    $validatedData['email_body'],
-                ],
-                'table' => [
-                    'columns' => [
-                        'Package',
-                        'Cycle',
-                        'Status',
-                        'Due Date',
-                    ],
-                    'rows' => [
-                        [
-                            $order->package->name,
-                            price($order->price).' / '.$order->cycle(),
-                            ucfirst($order->status),
-                            $order->due_date ? $order->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                        ],
-                    ],
-                ],
+            $user->email([
+                'identifier' => 'order.transferred',
+                'mailable_type' => Order::class,
+                'mailable_id' => $order->id,
+                'variables' => array_merge($order->orderEmailVariables(), [
+                    'message' => $validatedData['email_body'],
+                ]),
+                'table' => $order->orderEmailTable(),
                 'button' => [
-                    'text' => 'View Order',
                     'url' => route('orders.view', ['order' => $order->id]),
                 ],
             ]);

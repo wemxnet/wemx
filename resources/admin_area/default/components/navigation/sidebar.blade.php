@@ -255,23 +255,30 @@
                 @endperm
 
                 <!-- Emails -->
-                @perm('admin.emails.*')
+                @perm(['admin.emails.index', 'admin.emails.configure', 'admin.emails.templates'])
                 <x-admin::navigation.sidebar-item
                     :title="__('messages.emails')"
-                    :active="in_array($activePage, ['emails', 'configure_emails'])"
+                    :active="in_array($activePage, ['emails', 'configure_emails', 'email_templates'])"
                     :dropdown="true"
                     :id="'email-menu'">
                     <x-slot name="icon">
                         <x-admin::icon icon="mail-cog" outline/>
                     </x-slot>
-                    @perm('admin.gateways.configure')
+                    @perm('admin.emails.templates')
+                    <x-admin::navigation.sidebar-dropdown-item
+                        :title="__('messages.email_templates')"
+                        :href="route('admin.emails.templates.index')"
+                        :active="$activePage === 'email_templates'"
+                        :icon="'file-text'"/>
+                    @endperm
+                    @perm('admin.emails.configure')
                     <x-admin::navigation.sidebar-dropdown-item
                         :title="__('messages.configure_smtp')"
                         :href="route('admin.emails.configure')"
                         :active="$activePage === 'configure_emails'"
                         :icon="'mail-cog'"/>
                     @endperm
-                    @perm('admin.gateways.index')
+                    @perm('admin.emails.index')
                     <x-admin::navigation.sidebar-dropdown-item
                         :title="__('messages.email_history')"
                         :href="route('admin.emails.index')"

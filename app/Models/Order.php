@@ -377,224 +377,87 @@ class Order extends Model
 
     public function emailOrderConfirmation(): void
     {
-        $this->user->email([
-            'subject' => 'Order Confirmation for '.$this->package->name,
-            'lines' => [
-                'You are receiving this email because your order has been successfully received.',
-                'Your order is currently being processed, view the status of your order with the button below.',
-                '**Order Details:**',
-            ],
-            'table' => [
-                'columns' => [
-                    'Package',
-                    'Cycle',
-                    'Status',
-                    'Due Date',
-                ],
-                'rows' => [
-                    [
-                        $this->package->name,
-                        price($this->price).' / '.$this->cycle(),
-                        ucfirst($this->status),
-                        $this->due_date ? $this->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                    ],
-                ],
-            ],
-            'button' => [
-                'text' => 'View Order',
-                'url' => route('orders.view', ['order' => $this->id]),
-            ],
-        ]);
+        $this->sendOrderEmail('order.confirmation');
     }
 
     public function emailOrderActivation(): void
     {
-        $this->user->email([
-            'subject' => 'Your order has been activated - '.$this->package->name.' #'.$this->id,
-            'lines' => [
-                'You are receiving this email because your order has been activated.',
-                'Your service is now active, and you can start using it immediately.',
-                '**Order Details:**',
-            ],
-            'table' => [
-                'columns' => [
-                    'Package',
-                    'Cycle',
-                    'Status',
-                    'Due Date',
-                ],
-                'rows' => [
-                    [
-                        $this->package->name,
-                        price($this->price).' / '.$this->cycle(),
-                        ucfirst($this->status),
-                        $this->due_date ? $this->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                    ],
-                ],
-            ],
-            'button' => [
-                'text' => 'View Order',
-                'url' => route('orders.view', ['order' => $this->id]),
-            ],
-        ]);
+        $this->sendOrderEmail('order.activated');
     }
 
     public function emailOrderSuspension(): void
     {
-        $this->user->email([
-            'subject' => 'Your order has been suspended - '.$this->package->name.' #'.$this->id,
-            'lines' => [
-                'You are receiving this email because your order has been suspended.',
-                'Please renew your order to avoid service interruption using the button below.',
-                'If no action is taken, your order will be terminated permanently.',
-                '**Order Details:**',
-            ],
-            'table' => [
-                'columns' => [
-                    'Package',
-                    'Cycle',
-                    'Status',
-                    'Due Date',
-                ],
-                'rows' => [
-                    [
-                        $this->package->name,
-                        price($this->price).' / '.$this->cycle(),
-                        ucfirst($this->status),
-                        $this->due_date ? $this->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                    ],
-                ],
-            ],
-            'button' => [
-                'text' => 'View Order',
-                'url' => route('orders.view', ['order' => $this->id]),
-            ],
-        ]);
+        $this->sendOrderEmail('order.suspended');
     }
 
     public function emailOrderUnsuspension(): void
     {
-        $this->user->email([
-            'subject' => 'Your order has been unsuspended - '.$this->package->name.' #'.$this->id,
-            'lines' => [
-                'You are receiving this email because your order has been unsuspended.',
-                'Your service is now active again.',
-                '**Order Details:**',
-            ],
-            'table' => [
-                'columns' => [
-                    'Package',
-                    'Cycle',
-                    'Status',
-                    'Due Date',
-                ],
-                'rows' => [
-                    [
-                        $this->package->name,
-                        price($this->price).' / '.$this->cycle(),
-                        ucfirst($this->status),
-                        $this->due_date ? $this->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                    ],
-                ],
-            ],
-            'button' => [
-                'text' => 'View Order',
-                'url' => route('orders.view', ['order' => $this->id]),
-            ],
-        ]);
+        $this->sendOrderEmail('order.unsuspended');
     }
 
     public function emailOrderTermination(): void
     {
-        $this->user->email([
-            'subject' => 'Your order has been terminated - '.$this->package->name.' #'.$this->id,
-            'lines' => [
-                'You are receiving this email because your order has been terminated.',
-                '**Order Details:**',
-            ],
-            'table' => [
-                'columns' => [
-                    'Package',
-                    'Cycle',
-                    'Status',
-                    'Due Date',
-                ],
-                'rows' => [
-                    [
-                        $this->package->name,
-                        price($this->price).' / '.$this->cycle(),
-                        ucfirst($this->status),
-                        $this->due_date ? $this->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                    ],
-                ],
-            ],
-            'button' => [
-                'text' => 'View Order',
-                'url' => route('orders.view', ['order' => $this->id]),
-            ],
-        ]);
+        $this->sendOrderEmail('order.terminated');
     }
 
     public function emailAutoBalanceRenewal(): void
     {
-        $this->user->email([
-            'subject' => 'Order Renewed Successfully - '.$this->package->name.' #'.$this->id,
-            'lines' => [
-                'You are receiving this email because your order has been successfully renewed using your account balance.',
-                '**Order Details:**',
-            ],
-            'table' => [
-                'columns' => [
-                    'Package',
-                    'Cycle',
-                    'Status',
-                    'Due Date',
-                ],
-                'rows' => [
-                    [
-                        $this->package->name,
-                        price($this->price).' / '.$this->cycle(),
-                        ucfirst($this->status),
-                        $this->due_date ? $this->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                    ],
-                ],
-            ],
-            'button' => [
-                'text' => 'View Order',
-                'url' => route('orders.view', ['order' => $this->id]),
-            ],
-        ]);
+        $this->sendOrderEmail('order.renewed.balance');
     }
 
-    public function emailNotEnoughBalanceForAutoRenewal()
+    public function emailNotEnoughBalanceForAutoRenewal(): void
+    {
+        $this->sendOrderEmail('order.renewal.insufficient_balance');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function orderEmailVariables(): array
+    {
+        return [
+            'package_name' => $this->package->name,
+            'order_id' => $this->id,
+            'cycle' => price($this->price).' / '.$this->cycle(),
+            'status' => ucfirst($this->status),
+            'due_date' => $this->due_date ? $this->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
+        ];
+    }
+
+    /**
+     * @return array{columns: array<int, string>, rows: array<int, array<int, mixed>>}
+     */
+    public function orderEmailTable(): array
+    {
+        $variables = $this->orderEmailVariables();
+
+        return [
+            'columns' => [
+                'Package',
+                'Cycle',
+                'Status',
+                'Due Date',
+            ],
+            'rows' => [
+                [
+                    $variables['package_name'],
+                    $variables['cycle'],
+                    $variables['status'],
+                    $variables['due_date'],
+                ],
+            ],
+        ];
+    }
+
+    public function sendOrderEmail(string $identifier, array $variables = []): void
     {
         $this->user->email([
-            'subject' => 'Order Renewal Failed - '.$this->package->name.' #'.$this->id,
-            'lines' => [
-                'You are receiving this email because your order renewal has failed due to insufficient account balance.',
-                'If you wish to disable auto-balance renewal, you can do so on the order management page.',
-                '',
-                'Please add funds to your account to renew your order and avoid service interruption.',
-                '**Order Details:**',
-            ],
-            'table' => [
-                'columns' => [
-                    'Package',
-                    'Cycle',
-                    'Status',
-                    'Due Date',
-                ],
-                'rows' => [
-                    [
-                        $this->package->name,
-                        price($this->price).' / '.$this->cycle(),
-                        ucfirst($this->status),
-                        $this->due_date ? $this->due_date->format(settings('date_format', 'd M Y H:i')) : 'Never',
-                    ],
-                ],
-            ],
+            'identifier' => $identifier,
+            'mailable_type' => self::class,
+            'mailable_id' => $this->id,
+            'variables' => array_merge($this->orderEmailVariables(), $variables),
+            'table' => $this->orderEmailTable(),
             'button' => [
-                'text' => 'View Order',
                 'url' => route('orders.view', ['order' => $this->id]),
             ],
         ]);

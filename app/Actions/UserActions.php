@@ -4,9 +4,10 @@ namespace App\Actions;
 
 use App\Facades\World;
 use App\Models\Email;
+use App\Models\EmailTemplate;
 use App\Models\Session;
-use App\Models\UserBan;
 use App\Models\User;
+use App\Models\UserBan;
 use App\Rules\ValidVatNumber;
 use Exception;
 use Illuminate\Support\Facades\Hash;
@@ -22,7 +23,6 @@ class UserActions extends Action
      * It validates the input data, hashes the password, and creates a new user.
      * It also updates the user's address information if provided.
      *
-     * @param array $input
      *
      * @return User
      *
@@ -52,7 +52,7 @@ class UserActions extends Action
         ])->validate();
 
         // if password is not set, generate a random one
-        if(!isset($validatedData['password'])) {
+        if (! isset($validatedData['password'])) {
             $randomPassword = Str::random(12);
             $validatedData['password'] = $randomPassword;
         }
@@ -74,14 +74,9 @@ class UserActions extends Action
         ]));
 
         // if a random password was generated, send it to the user
-        if(isset($randomPassword)) {
+        if (isset($randomPassword)) {
             $user->email([
-               'subject' => 'Your account has been created on '. settings('app_name', 'My Application'),
-                'lines' => [
-                    'You are receiving this email because your account has been created on '. settings('app_name', 'My Application') .'.',
-                    'Please change your password after logging in.',
-                    '**Account Details:**',
-                ],
+                'identifier' => 'account.created',
                 'table' => [
                     'columns' => [
                         'Username',
@@ -93,18 +88,17 @@ class UserActions extends Action
                             $user->username,
                             $user->email,
                             $randomPassword,
-                        ]
-                    ]
+                        ],
+                    ],
                 ],
                 'button' => [
-                    'text' => 'Login to your account',
                     'url' => route('login'),
                 ],
             ]);
         }
 
         // if the user should be verified, send a verification email
-        if(isset($validatedData['verify_email']) && $validatedData['verify_email']) {
+        if (isset($validatedData['verify_email']) && $validatedData['verify_email']) {
             $user->markEmailAsVerified();
         } else {
             $user->emailVerificationToken();
@@ -113,7 +107,7 @@ class UserActions extends Action
         $user->logActivity([
             'user_id' => auth()->check() ? auth()->id() : null,
             'event' => 'user.created',
-            'description' => 'User created manually by ' . (auth()->check() ? auth()->user()->username : 'system'),
+            'description' => 'User created manually by '.(auth()->check() ? auth()->user()->username : 'system'),
             'model_type' => User::class,
             'model_id' => $user->id,
         ]);
@@ -122,11 +116,62 @@ class UserActions extends Action
     }
 
     /**
+     * Send a manual email to a user from the admin area.
+     *
+     * @param  array<string, mixed>  $input
+     *
+     * @throws ValidationException
+     */
+    public function sendEmailAsAdmin(array $input): void
+    {
+        $input['button_text'] = filled($input['button_text'] ?? null) ? trim((string) $input['button_text']) : null;
+        $input['button_url'] = filled($input['button_url'] ?? null) ? trim((string) $input['button_url']) : null;
+
+        $validated = Validator::make($input, [
+            'user_id' => ['required', 'exists:users,id'],
+            'subject' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string', 'max:20000'],
+            'button_text' => ['nullable', 'string', 'max:255', 'required_with:button_url'],
+            'button_url' => ['nullable', 'url', 'max:2048', 'required_with:button_text'],
+        ])->validate();
+
+        $user = User::query()->find($validated['user_id']);
+
+        if (! $user) {
+            throw ValidationException::withMessages([
+                'user_id' => 'User not found',
+            ]);
+        }
+
+        $lines = EmailTemplate::bodyToLines($validated['body']);
+
+        if ($lines === []) {
+            throw ValidationException::withMessages([
+                'body' => __('validation.required', ['attribute' => 'body']),
+            ]);
+        }
+
+        $payload = [
+            'identifier' => 'admin.manual-email',
+            'subject' => $validated['subject'],
+            'lines' => $lines,
+        ];
+
+        if ($validated['button_text'] && $validated['button_url']) {
+            $payload['button'] = [
+                'text' => $validated['button_text'],
+                'url' => $validated['button_url'],
+            ];
+        }
+
+        $user->email($payload);
+    }
+
+    /**
      * This function updates an existing user as an admin.
      * It validates the input data, hashes the password if provided,
      * and updates the user information.
      *
-     * @param array $input
      *
      * @return bool
      *
@@ -136,7 +181,7 @@ class UserActions extends Action
     {
         $user = User::find($input['user_id'] ?? 'null');
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
@@ -146,8 +191,8 @@ class UserActions extends Action
             'user_id' => 'required|exists:users,id',
             'first_name' => 'sometimes|required|min:3|max:50',
             'last_name' => 'nullable|min:3|max:50',
-            'username' => 'sometimes|required|min:3|max:50|unique:users,username,' . $user->id . ',id',
-            'email' => 'sometimes|required|email|unique:users,email,' . $user->id . ',id',
+            'username' => 'sometimes|required|min:3|max:50|unique:users,username,'.$user->id.',id',
+            'email' => 'sometimes|required|email|unique:users,email,'.$user->id.',id',
             'status' => 'sometimes|required|in:active,pending,suspended',
             'lang' => 'nullable|min:2|max:2',
             'password' => 'nullable|min:8|max:50',
@@ -163,20 +208,15 @@ class UserActions extends Action
         // if the status is changed to active, email the user
         if (isset($validatedData['status']) && $user->status !== $validatedData['status'] && $validatedData['status'] === 'active') {
             $user->email([
-                'subject' => 'Your account has been activated',
-                'lines' => [
-                    'You are receiving this email because your account on '. settings('app_name', 'My Application') .' is now active.',
-                    'You can now log in to your account.',
-                ],
+                'identifier' => 'account.activated',
                 'button' => [
-                    'text' => 'Login to your account',
                     'url' => route('login'),
                 ],
             ]);
         }
 
         // if password is null, remove it from the array
-        if(!isset($validatedData['password'])) {
+        if (! isset($validatedData['password'])) {
             unset($validatedData['password']);
         }
 
@@ -192,7 +232,6 @@ class UserActions extends Action
     /**
      * Update user address as admin
      *
-     * @param array $input
      *
      * @return bool
      *
@@ -214,7 +253,7 @@ class UserActions extends Action
 
         $user = User::find($validatedData['user_id']);
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
@@ -239,9 +278,7 @@ class UserActions extends Action
     /**
      * Delete a user as an admin.
      *
-     * @param User $user
      *
-     * @return bool|null
      *
      * @throws Exception
      */
@@ -265,7 +302,7 @@ class UserActions extends Action
 
         $user = User::find($validatedData['user_id']);
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
@@ -301,13 +338,13 @@ class UserActions extends Action
 
         $user = User::find($validatedData['user_id']);
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
         }
 
-        if(!$user->tfa_enabled) {
+        if (! $user->tfa_enabled) {
             throw ValidationException::withMessages([
                 'user_id' => 'Two-factor authentication is not enabled for this user',
             ]);
@@ -320,13 +357,7 @@ class UserActions extends Action
 
         // Notify user of 2FA disable
         $user->email([
-           'identifier' => 'account.2fa.disabled',
-            'subject' => 'Two-factor authentication has been disabled by an administrator',
-            'lines' => [
-                'You are receiving this email because two-factor authentication was disabled on your account on '. settings('app_name', 'Application') . '.',
-                'This action was performed by an administrator.',
-                'If you did not request this change, please contact support immediately.',
-            ],
+            'identifier' => 'account.2fa.disabled_by_admin',
         ]);
 
         return true;
@@ -337,7 +368,6 @@ class UserActions extends Action
      * It validates the input data, checks if the user exists,
      * and updates the user information.
      *
-     * @param array $input
      *
      * @return bool
      *
@@ -349,14 +379,14 @@ class UserActions extends Action
             'user_id' => ['required', 'exists:users,id'],
             'first_name' => ['sometimes', 'required', 'alpha', 'min:3', 'max:255'],
             'last_name' => ['sometimes', 'required', 'alpha', 'min:3', 'max:255'],
-            'username' => ['sometimes', 'required', 'alpha_num', 'min:5', 'max:50', 'unique:users,username,' . $input['user_id']],
+            'username' => ['sometimes', 'required', 'alpha_num', 'min:5', 'max:50', 'unique:users,username,'.$input['user_id']],
             'phone' => ['nullable', 'regex:/^\+?[0-9]{7,15}$/'],
             'is_subscribed' => ['sometimes', 'boolean'],
         ])->validate();
 
         $user = User::find($input['user_id']);
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
@@ -383,7 +413,7 @@ class UserActions extends Action
 
         $user = User::find($validatedData['user_id']);
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
@@ -408,7 +438,6 @@ class UserActions extends Action
     /**
      * This function updates the email address of a user as a client.
      *
-     * @param array $input
      *
      * @return bool
      *
@@ -425,26 +454,26 @@ class UserActions extends Action
 
         $user = User::find($input['user_id']);
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
         }
 
-        if(!Hash::check($input['current_password'], $user->password)) {
+        if (! Hash::check($input['current_password'], $user->password)) {
             throw ValidationException::withMessages([
                 'current_password' => 'Current password is incorrect',
             ]);
         }
 
-        if($user->tfa_enabled) {
-            if (!isset($validatedData['tfa_code'])) {
+        if ($user->tfa_enabled) {
+            if (! isset($validatedData['tfa_code'])) {
                 throw ValidationException::withMessages([
                     'tfa_code' => 'Two-factor authentication code is required',
                 ]);
             }
 
-            if (!$user->verifyTfaCode($validatedData['tfa_code'])) {
+            if (! $user->verifyTfaCode($validatedData['tfa_code'])) {
                 throw ValidationException::withMessages([
                     'tfa_code' => 'The provided two-factor authentication code is invalid',
                 ]);
@@ -452,21 +481,13 @@ class UserActions extends Action
         }
 
         $token = Str::random(48);
-        Email::create([
+        Email::actions()->sendEmailToAddress([
             'user_id' => $user->id,
             'token' => $token,
             'identifier' => 'account.email.change.requested',
             'to' => $validatedData['new_email'],
-            'subject' => 'Confirm your new email address',
-            'lines' => [
-                'You are receiving this email because you requested to change your email address on '. settings('app_name', 'My Application') .'.',
-                'Please click the button below to confirm your new email address.',
-                'If you did not request this change, please ignore this email.',
-            ],
-            'button_text' => 'Confirm New Email Address',
             'button_url' => route('confirm-email-address', $token),
-            'theme' => 'default',
-            'display' => 0, // do not display this email in the user's email list
+            'display' => false,
         ]);
     }
 
@@ -475,7 +496,6 @@ class UserActions extends Action
      * It validates the input data, checks if the user exists,
      * and updates the password if the current password is correct.
      *
-     * @param array $input
      *
      * @return bool
      *
@@ -493,26 +513,26 @@ class UserActions extends Action
 
         $user = User::find($input['user_id']);
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
         }
 
-        if(!Hash::check($input['current_password'], $user->password)) {
+        if (! Hash::check($input['current_password'], $user->password)) {
             throw ValidationException::withMessages([
                 'current_password' => 'Current password is incorrect',
             ]);
         }
 
-        if($user->tfa_enabled) {
-            if (!isset($validatedData['tfa_code'])) {
+        if ($user->tfa_enabled) {
+            if (! isset($validatedData['tfa_code'])) {
                 throw ValidationException::withMessages([
                     'tfa_code' => 'Two-factor authentication code is required',
                 ]);
             }
 
-            if (!$user->verifyTfaCode($validatedData['tfa_code'])) {
+            if (! $user->verifyTfaCode($validatedData['tfa_code'])) {
                 throw ValidationException::withMessages([
                     'tfa_code' => 'The provided two-factor authentication code is invalid',
                 ]);
@@ -522,11 +542,6 @@ class UserActions extends Action
         // Notify user of password change
         $user->email([
             'identifier' => 'account.password.change.confirmed',
-            'subject' => 'Your password has been changed',
-            'lines' => [
-                'You are receiving this email because your password was changed of your account on '. settings('app_name', 'Application') . '.',
-                'If you did not make this change, please contact support immediately.',
-            ],
         ]);
 
         return $user->update([
@@ -543,7 +558,7 @@ class UserActions extends Action
 
         $user = User::find($validatedData['user_id']);
 
-        if(!$user) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'user_id' => 'User not found',
             ]);
@@ -551,7 +566,7 @@ class UserActions extends Action
 
         $session = Session::where('user_id', $user->id)->where('id', $validatedData['session_id'])->first();
 
-        if(!$session) {
+        if (! $session) {
             throw ValidationException::withMessages([
                 'session_id' => 'Session not found',
             ]);
@@ -573,7 +588,7 @@ class UserActions extends Action
         $user = User::find($validatedData['user_id']);
         $admin = User::find($validatedData['admin_id']);
 
-        if (!$user || !$admin) {
+        if (! $user || ! $admin) {
             throw ValidationException::withMessages([
                 'user_id' => 'User or admin not found.',
             ]);
@@ -601,7 +616,7 @@ class UserActions extends Action
                 ->latest('last_activity')
                 ->value('ip_address');
 
-            if (!$ipAddress) {
+            if (! $ipAddress) {
                 throw ValidationException::withMessages([
                     'ip_ban' => 'No session IP address found for this user.',
                 ]);
@@ -637,7 +652,7 @@ class UserActions extends Action
         $ban = UserBan::find($validatedData['ban_id']);
         $admin = User::find($validatedData['admin_id']);
 
-        if (!$ban || !$admin) {
+        if (! $ban || ! $admin) {
             throw ValidationException::withMessages([
                 'ban_id' => 'Ban or admin not found.',
             ]);

@@ -40,40 +40,45 @@ class OrderMember extends Model
 
     public function sendEmailNotification()
     {
-        $emailData = [
+        $payload = [
             'mailable_type' => Order::class,
             'mailable_id' => $this->order_id,
-            'user_id' => $this->user_id,
+            'identifier' => 'order.member.invited',
             'to' => $this->email,
-            'subject' => "You have been invited to manage {$this->order->package->name}",
-            'lines' => [
-                "You have been added as a member to the order for {$this->order->package->name}.",
-                "If you don't have an account, you can create one using the email: {$this->email}.",
-                "The invitation will appear in your account once you log in.",
+            'variables' => [
+                'package_name' => $this->order->package->name,
+                'member_email' => $this->email,
             ],
-            'button_text' => 'View Invite',
             'button_url' => route('dashboard.order-invites'),
         ];
 
-        Email::create($emailData);
+        if ($this->user_id && $this->user) {
+            $this->user->email([
+                ...$payload,
+                'button' => [
+                    'url' => $payload['button_url'],
+                ],
+            ]);
+
+            return;
+        }
+
+        Email::actions()->sendEmailToAddress($payload);
     }
 
     public function sendAcceptionEmailNotification($user)
     {
-        $emailData = [
+        $this->order->user->email([
             'mailable_type' => Order::class,
             'mailable_id' => $this->order_id,
-            'user_id' => $this->order->user_id,
-            'to' => $this->order->user->email,
-            'subject' => "{$user->username} has accepted your invite to manage {$this->order->package->name}",
-            'lines' => [
-                "{$user->username} has accepted your invite to manage {$this->order->package->name}.",
-                "Members can be viewed in the order details or with the button below.",
+            'identifier' => 'order.member.accepted',
+            'variables' => [
+                'package_name' => $this->order->package->name,
+                'username' => $user->username,
             ],
-            'button_text' => 'View Members',
-            'button_url' => route('orders.view.members', ['order' => $this->order_id]),
-        ];
-
-        Email::create($emailData);
+            'button' => [
+                'url' => route('orders.view.members', ['order' => $this->order_id]),
+            ],
+        ]);
     }
 }

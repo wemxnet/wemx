@@ -153,11 +153,6 @@ class AuthController extends Controller
 
         $email->user->email([
             'identifier' => 'account.2fa.disable.confirmed',
-            'subject' => 'Two-Factor Authentication Disabled',
-            'lines' => [
-                'You are receiving this email because two-factor authentication (2FA) has been disabled on your account on '.settings('app_name', 'Application').'.',
-                'If you did not make this change, please contact support immediately.',
-            ],
         ]);
 
         return redirect()->route('account.settings');
@@ -185,11 +180,8 @@ class AuthController extends Controller
         // notify user on their previous email address
         $user->email([
             'identifier' => 'account.email.change.confirmed',
-            'subject' => 'Your email address has been changed',
-            'lines' => [
-                'You are receiving this email because your email address was changed of your account on '.settings('app_name', 'Application').'.',
-                "The new email address is **{$email->to}**.",
-                'If you did not make this change, please contact support immediately.',
+            'variables' => [
+                'new_email' => $email->to,
             ],
         ]);
 

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Services\Extensions;
 
 class UsersController extends Controller
 {
@@ -17,12 +16,18 @@ class UsersController extends Controller
     {
         return view('admin::users.create');
     }
+
     public function edit(User $user)
     {
         // if user doesnt have an address for whatever reason, create one
         $user->createEmptyAddress();
 
         return view('admin::users.edit', compact('user'));
+    }
+
+    public function sendEmail(User $user)
+    {
+        return view('admin::users.send-email', compact('user'));
     }
 
     public function impersonate(User $user)
@@ -40,7 +45,7 @@ class UsersController extends Controller
     {
         $userId = session('impersonate');
 
-        if (!$userId) {
+        if (! $userId) {
             return redirect()->route('admin.users.index');
         }
 

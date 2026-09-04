@@ -14,6 +14,7 @@ Route::group(['prefix' => 'users'], function () {
     Route::get('/', [Admin\UsersController::class, 'index'])->name('users.index')->middleware('permission:admin.users');
     Route::get('/create', [Admin\UsersController::class, 'create'])->name('users.create')->middleware('permission:admin.users.create');
     Route::get('/edit/{user:id}', [Admin\UsersController::class, 'edit'])->name('users.edit')->middleware('permission:admin.users.view');
+    Route::get('/edit/{user:id}/send-email', [Admin\UsersController::class, 'sendEmail'])->name('users.send-email')->middleware('permission:admin.users.update');
     Route::get('/edit/{user:id}/impersonate', [Admin\UsersController::class, 'impersonate'])->name('users.impersonate')->middleware('permission:admin.users.impersonate');
     Route::get('/exit-impersonate', [Admin\UsersController::class, 'exitImpersonate'])->name('users.exit-impersonate')->withoutMiddleware(['admin', AdminPathMiddleware::class]);
 });
@@ -74,9 +75,14 @@ Route::group(['prefix' => 'gateways'], function () {
 });
 
 Route::group(['prefix' => 'emails'], function () {
-    Route::get('/', [Admin\EmailsController::class, 'index'])->name('emails.index');
-    Route::get('/view/{email:id}', [Admin\EmailsController::class, 'view'])->name('emails.view');
-    Route::get('/configure', [Admin\EmailsController::class, 'configure'])->name('emails.configure');
+    Route::get('/', [Admin\EmailsController::class, 'index'])->name('emails.index')->middleware('permission:admin.emails.index');
+    Route::get('/view/{email:id}', [Admin\EmailsController::class, 'view'])->name('emails.view')->middleware('permission:admin.emails.index');
+    Route::get('/configure', [Admin\EmailsController::class, 'configure'])->name('emails.configure')->middleware('permission:admin.emails.configure');
+    Route::get('/templates', [Admin\EmailsController::class, 'templates'])->name('emails.templates.index')->middleware('permission:admin.emails.templates');
+    Route::get('/templates/{template}', [Admin\EmailsController::class, 'editTemplate'])
+        ->name('emails.templates.edit')
+        ->middleware('permission:admin.emails.templates')
+        ->where('template', '[A-Za-z0-9._-]+');
 });
 
 Route::group(['prefix' => 'servers'], function () {

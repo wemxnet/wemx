@@ -348,10 +348,14 @@ class Payment extends Model
         }
 
         $this->user->email([
-            'subject' => 'Payment was successfully processed',
-            'lines' => [
-                'You are receiving this email because your payment was successfully processed.',
-                '**Payment Details:**',
+            'identifier' => 'payment.paid',
+            'mailable_type' => self::class,
+            'mailable_id' => $this->id,
+            'variables' => [
+                'description' => Str::limit($this->description, 50),
+                'amount' => priceIn($this->total(), $this->currency),
+                'transaction_id' => Str::limit($this->transaction_id, 32),
+                'date' => now()->format(settings('date_format', 'd M Y H:i')),
             ],
             'table' => [
                 'columns' => [
@@ -370,8 +374,7 @@ class Payment extends Model
                 ],
             ],
             'button' => [
-                'text' => 'View Invoice',
-                'url' => 'https://example.com/payment/invoice/'.$this->id,
+                'url' => route('payments.view', $this),
             ],
         ]);
     }
