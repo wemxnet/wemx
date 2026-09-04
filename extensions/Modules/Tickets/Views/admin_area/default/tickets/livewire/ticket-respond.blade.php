@@ -275,6 +275,9 @@ new class extends Component
                                     @elseif($item->isFromAdmin())
                                         <span class="badge bg-primary-lt">{{ __('tickets::messages.staff') }}</span>
                                     @endif
+                                    @if($item->isFromEmail())
+                                        <span class="badge bg-azure-lt">{{ __('tickets::messages.via_email') }}</span>
+                                    @endif
                                     <span class="text-secondary ms-2">{{ $item->created_at->diffForHumans() }}</span>
                                 </div>
                             </div>

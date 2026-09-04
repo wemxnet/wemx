@@ -124,9 +124,12 @@ class TicketNotifier
             'template' => $template,
             'identifier' => $template.'.'.$ticket->id,
             'variables' => $variables,
+            'mailable_type' => Ticket::class,
+            'mailable_id' => $ticket->id,
             'button_url' => $ticket->adminUrl(),
             'display' => false,
             'cooldown' => 2,
+            'data' => TicketInboundMail::outboundData($ticket),
         ]);
     }
 
@@ -145,6 +148,7 @@ class TicketNotifier
             'mailable_type' => Ticket::class,
             'mailable_id' => $ticket->id,
             'button_url' => $url,
+            'data' => TicketInboundMail::outboundData($ticket),
         ];
 
         if ($member->user_id && $member->user) {

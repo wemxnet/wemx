@@ -167,6 +167,46 @@ class EmailTemplateTest extends TestCase
         $this->assertSame('See invoice', $template->button_text);
     }
 
+    public function test_template_preview_renders_tables_as_html(): void
+    {
+        $admin = User::factory()->create(['username' => 'admin']);
+
+        $this->actingAs($admin);
+
+        $html = Volt::test('admin_area.default.emails.livewire.edit-template-form', ['template' => 'account.created'])
+            ->instance()
+            ->previewHtml();
+
+        $this->assertStringContainsString('Username', $html);
+        $this->assertStringContainsString('alex@example.com', $html);
+        $this->assertStringContainsString('s3cretPass', $html);
+        $this->assertStringContainsString('<th', $html);
+        $this->assertStringContainsString('<td', $html);
+        $this->assertStringNotContainsString('&lt;thead&gt;', $html);
+        $this->assertStringNotContainsString('&lt;th', $html);
+        $this->assertStringNotContainsString('<!--[if BLOCK]', $html);
+        $this->assertSame(0, Email::query()->count());
+    }
+
+    public function test_template_preview_renders_sample_content_without_sending(): void
+    {
+        $admin = User::factory()->create();
+
+        $this->actingAs($admin);
+
+        $html = Volt::test('admin_area.default.emails.livewire.edit-template-form', ['template' => 'payment.paid'])
+            ->set('body', 'We received {{amount}} for {{description}}.')
+            ->set('buttonText', 'See invoice')
+            ->instance()
+            ->previewHtml();
+
+        $this->assertStringContainsString('We received $10.00', $html);
+        $this->assertStringContainsString('Invoice for hosting', $html);
+        $this->assertStringContainsString('See invoice', $html);
+        $this->assertStringContainsString($admin->username, $html);
+        $this->assertSame(0, Email::query()->count());
+    }
+
     public function test_ticket_templates_compose_guest_notes_and_subjects(): void
     {
         $composed = EmailTemplate::compose([

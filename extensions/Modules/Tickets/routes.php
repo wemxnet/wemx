@@ -3,7 +3,12 @@
 use App\Http\Middleware\RequireAdminReauthentication;
 use Extensions\Modules\Tickets\Http\Controllers\Admin;
 use Extensions\Modules\Tickets\Http\Controllers\Client;
+use Extensions\Modules\Tickets\Http\Controllers\InboundMailController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/tickets/inbound-mail', InboundMailController::class)
+    ->middleware('throttle:60,1')
+    ->name('tickets.inbound-mail');
 
 Route::middleware('web')->group(function () {
     Route::get('/tickets', [Client\TicketsController::class, 'index'])->name('tickets.index');

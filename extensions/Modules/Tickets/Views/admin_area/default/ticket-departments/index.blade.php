@@ -15,6 +15,9 @@
 @endsection
 
 @section('content')
+    @perm('admin.ticket-departments')
+        @livewire('admin_area.default.ticket-departments.livewire.inbound-mail-settings')
+    @endperm
     @livewire(admin_view_path('livewire.table'), [
         'title' => 'Departments',
         'entries' => 25,

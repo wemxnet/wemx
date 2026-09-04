@@ -75,6 +75,11 @@ class TicketMessage extends Model
         return (bool) $this->from_admin;
     }
 
+    public function isFromEmail(): bool
+    {
+        return ($this->meta['source'] ?? null) === 'email';
+    }
+
     public function timelineIcon(): string
     {
         return match (true) {

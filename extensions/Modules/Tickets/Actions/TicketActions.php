@@ -9,7 +9,10 @@ use Extensions\Modules\Tickets\Models\Ticket;
 use Extensions\Modules\Tickets\Models\TicketDepartment;
 use Extensions\Modules\Tickets\Models\TicketMember;
 use Extensions\Modules\Tickets\Models\TicketMessage;
+use Extensions\Modules\Tickets\Support\InboundMailParser;
+use Extensions\Modules\Tickets\Support\TicketInboundMail;
 use Extensions\Modules\Tickets\Support\TicketNotifier;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -176,6 +179,88 @@ class TicketActions extends Action
         TicketNotifier::messagePosted($ticket->fresh(['members', 'department']), $message);
 
         return $message;
+    }
+
+    public function replyFromInboundMail(string $raw): ?TicketMessage
+    {
+        $raw = trim($raw);
+
+        if ($raw === '') {
+            return null;
+        }
+
+        $parsed = InboundMailParser::parse($raw);
+        $lockKey = 'tickets-inbound-'.hash('sha256', $parsed->messageId ?: $raw);
+
+        return Cache::lock($lockKey, 10)->block(5, function () use ($parsed, $raw) {
+            if ($parsed->automatic || $parsed->fromEmail === null) {
+                return null;
+            }
+
+            if ($this->inboundMailAlreadyImported($parsed->messageId, $raw)) {
+                return null;
+            }
+
+            $ticket = TicketInboundMail::locateTicket($parsed);
+
+            if (! $ticket) {
+                return null;
+            }
+
+            $fromEmail = Str::lower($parsed->fromEmail);
+            $user = User::query()->where('email', $fromEmail)->first();
+            $member = $ticket->memberForUser($user, $fromEmail);
+            $isClientMember = $member && in_array($member->role, [TicketMember::ROLE_OWNER, TicketMember::ROLE_MEMBER], true);
+            $isStaffSender = $this->isInboundStaffSender($ticket, $user, $member, $fromEmail);
+
+            if (! $isClientMember && ! $isStaffSender) {
+                return null;
+            }
+
+            $fromAdmin = $isStaffSender && ! $isClientMember;
+
+            if ($ticket->isLocked() && ! $fromAdmin) {
+                return null;
+            }
+
+            $body = Str::length($parsed->body) > 20000
+                ? Str::substr($parsed->body, 0, 20000)
+                : $parsed->body;
+
+            if (trim($body) === '') {
+                return null;
+            }
+
+            if ($ticket->isClosed()) {
+                $this->reopenFromInbound($ticket, $user, $member, $fromAdmin);
+                $ticket = $ticket->fresh(['members', 'department']);
+            }
+
+            if ($fromAdmin && $user) {
+                $member = $this->ensureMember($ticket, $user, TicketMember::ROLE_STAFF, subscribed: true);
+            }
+
+            $message = $this->addComment(
+                ticket: $ticket,
+                body: $body,
+                user: $user,
+                member: $member,
+                isStaff: $fromAdmin || (bool) $user?->isStaff(),
+                authorName: $parsed->fromName,
+                authorEmail: $fromEmail,
+                fromAdmin: $fromAdmin,
+                meta: [
+                    'source' => 'email',
+                    'message_id' => $parsed->messageId,
+                    'hash' => hash('sha256', $raw),
+                    'from' => $fromEmail,
+                ],
+            );
+
+            TicketNotifier::messagePosted($ticket->fresh(['members', 'department']), $message);
+
+            return $message;
+        });
     }
 
     public function addInternalNote(array $input): TicketMessage
@@ -627,6 +712,7 @@ class TicketActions extends Action
         ?string $authorName = null,
         ?string $authorEmail = null,
         bool $fromAdmin = false,
+        array $meta = [],
     ): TicketMessage {
         $message = $ticket->messages()->create([
             'user_id' => $user?->id,
@@ -634,6 +720,7 @@ class TicketActions extends Action
             'is_staff' => $isStaff,
             'from_admin' => $fromAdmin,
             'body' => $body,
+            'meta' => $meta !== [] ? $meta : null,
             'author_name' => $authorName ?: ($user ? ($user->full_name ?: $user->username) : $member?->displayName()),
             'author_email' => $authorEmail ?: ($user?->email ?? $member?->email),
         ]);
@@ -905,6 +992,55 @@ class TicketActions extends Action
                 'ticket_id' => 'This ticket is locked. Only staff can make changes.',
             ]);
         }
+    }
+
+    protected function inboundMailAlreadyImported(?string $messageId, string $raw): bool
+    {
+        $hash = hash('sha256', $raw);
+
+        return TicketMessage::query()
+            ->where('meta->source', 'email')
+            ->where(function ($query) use ($messageId, $hash) {
+                $query->where('meta->hash', $hash);
+
+                if ($messageId) {
+                    $query->orWhere('meta->message_id', $messageId);
+                }
+            })
+            ->exists();
+    }
+
+    protected function isInboundStaffSender(Ticket $ticket, ?User $user, ?TicketMember $member, string $fromEmail): bool
+    {
+        if ($member?->role === TicketMember::ROLE_STAFF) {
+            return true;
+        }
+
+        if ($user?->isStaff() && $user->hasPermission('admin.tickets.view')) {
+            return true;
+        }
+
+        $notifyEmail = $ticket->department?->notify_email;
+
+        return is_string($notifyEmail) && strcasecmp($notifyEmail, $fromEmail) === 0;
+    }
+
+    protected function reopenFromInbound(Ticket $ticket, ?User $user, ?TicketMember $member, bool $fromAdmin): void
+    {
+        $ticket->update([
+            'status' => Ticket::STATUS_OPEN,
+            'closed_at' => null,
+            'closed_by' => null,
+            'last_reply_from' => $fromAdmin ? Ticket::REPLY_STAFF : Ticket::REPLY_CLIENT,
+            'last_replied_at' => now(),
+        ]);
+
+        $this->recordEvent($ticket, $user, 'status_changed', [
+            'action' => 'reopened',
+            'from' => Ticket::STATUS_CLOSED,
+            'to' => Ticket::STATUS_OPEN,
+            'reason' => 'email',
+        ], $member, fromAdmin: $fromAdmin);
     }
 
     protected function resolveMember(Ticket $ticket, ?User $user, ?string $guestEmail, ?string $accessToken): ?TicketMember

@@ -271,6 +271,7 @@ class User extends Authenticatable
             'attachments' => $data['attachments'] ?? null,
             'theme' => $data['theme'] ?? null,
             'display' => $data['display'] ?? null,
+            'data' => $data['data'] ?? null,
         ], fn ($value) => $value !== null));
     }
 

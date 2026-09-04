@@ -36,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'gateways/webhooks/*',
             'gateways/callbacks/*',
+            'tickets/inbound-mail',
         ]);
 
         $middleware->alias([

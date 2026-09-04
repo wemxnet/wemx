@@ -4,6 +4,7 @@ namespace Extensions\Modules\Tickets;
 
 use App\Extensions\Foundation\ModuleExtension;
 use Extensions\Modules\Tickets\Commands\AutoCloseInactiveTicketsCommand;
+use Extensions\Modules\Tickets\Commands\IngestInboundMailCommand;
 use Illuminate\Console\Scheduling\Schedule;
 
 class Module extends ModuleExtension
@@ -41,6 +42,7 @@ class Module extends ModuleExtension
     {
         return [
             AutoCloseInactiveTicketsCommand::class,
+            IngestInboundMailCommand::class,
         ];
     }
 

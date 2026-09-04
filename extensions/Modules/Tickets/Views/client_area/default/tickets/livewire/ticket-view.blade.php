@@ -223,6 +223,9 @@ new class extends Component
                                         @if($item->isFromAdmin())
                                             <span class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-800 dark:bg-primary-900 dark:text-primary-200">{{ __('tickets::messages.support') }}</span>
                                         @endif
+                                        @if($item->isFromEmail())
+                                            <span class="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-900 dark:text-sky-200">{{ __('tickets::messages.via_email') }}</span>
+                                        @endif
                                         <span class="text-gray-400">commented {{ $item->created_at->diffForHumans() }}</span>
                                     </div>
                                 </header>

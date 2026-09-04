@@ -176,7 +176,7 @@ new class extends Component
             <label class="col-3 col-form-label">Notify email</label>
             <div class="col">
                 <input type="email" class="form-control" wire:model="notify_email" placeholder="support@example.com">
-                <small class="form-hint">Optional inbox that receives new tickets and customer replies.</small>
+                <small class="form-hint">Optional inbox that receives new tickets and customer replies. Staff can reply to those emails to post on the ticket.</small>
             </div>
         </div>
         <div class="mb-3 row">

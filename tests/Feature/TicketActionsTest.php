@@ -33,7 +33,9 @@ class TicketActionsTest extends TestCase
     {
         parent::setUp();
 
-        $this->loadMigrationsFrom(base_path('extensions/Modules/Tickets/Migrations'));
+        $this->artisan('migrate', [
+            '--path' => 'extensions/Modules/Tickets/Migrations',
+        ]);
 
         if (! Route::has('tickets.view')) {
             require base_path('extensions/Modules/Tickets/routes.php');

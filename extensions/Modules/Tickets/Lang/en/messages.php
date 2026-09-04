@@ -32,6 +32,7 @@ return [
     'internal_note' => 'Internal note',
     'staff' => 'Staff',
     'support' => 'Support',
+    'via_email' => 'via email',
     'departments' => 'Departments',
     'auto_close' => 'Auto-close',
     'service' => 'Service',

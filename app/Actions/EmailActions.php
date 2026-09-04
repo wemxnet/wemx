@@ -38,6 +38,7 @@ class EmailActions extends Action
             'attachments' => ['nullable', 'array'],
             'theme' => ['nullable', 'string', 'max:255'],
             'display' => ['nullable', 'boolean'],
+            'data' => ['nullable', 'array'],
         ])->validate();
 
         if (! $user) {
@@ -90,6 +91,7 @@ class EmailActions extends Action
             'theme' => ['nullable', 'string', 'max:255'],
             'display' => ['nullable', 'boolean'],
             'cooldown' => ['nullable', 'integer'],
+            'data' => ['nullable', 'array'],
         ])->validate();
 
         if (isset($validated['cooldown'])) {

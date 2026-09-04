@@ -5,7 +5,5 @@
 @section('title', __('messages.edit_email_template'))
 
 @section('content')
-    <div class="col-12">
-        @livewire(admin_view_path('emails.livewire.edit-template-form'), ['template' => $template])
-    </div>
+    @livewire(admin_view_path('emails.livewire.edit-template-form'), ['template' => $template])
 @endsection
