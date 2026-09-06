@@ -643,6 +643,31 @@ BODY,
     |--------------------------------------------------------------------------
     */
 
+    'server.proxmox.created' => [
+        'name' => 'Proxmox virtual machine created',
+        'group' => 'Servers',
+        'description' => 'Sent when a Proxmox virtual machine is provisioned for an order.',
+        'subject' => 'Your virtual machine is ready',
+        'body' => <<<'BODY'
+Your Linux server has been created and is ready to use.
+**Server details:**
+Hostname: {{hostname}}
+IP address: {{ipv4}}
+Operating system: {{os_label}}
+Username: {{username}}
+Password: {{password}}
+You can manage power, usage, and reinstalls from your order page.
+BODY,
+        'button_text' => 'Manage server',
+        'placeholders' => [
+            'hostname' => 'Virtual machine hostname',
+            'ipv4' => 'Assigned IPv4 address or DHCP',
+            'os_label' => 'Operating system label',
+            'username' => 'Cloud-init username',
+            'password' => 'Initial password',
+        ],
+    ],
+
     'server.pterodactyl.account_created' => [
         'name' => 'Pterodactyl account created',
         'group' => 'Servers',

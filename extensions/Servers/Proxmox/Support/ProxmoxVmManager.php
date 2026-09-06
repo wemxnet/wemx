@@ -126,7 +126,13 @@ class ProxmoxVmManager
     public function upgrade(Order $order, PackagePrice $newPackagePrice): array
     {
         [$node, $vmid] = $this->locate($order);
-        $plan = $this->plan($newPackagePrice->package, $this->orderOptions($order));
+        $plan = $this->plan($newPackagePrice->package, Arr::only($this->orderOptions($order), [
+            'os_template',
+            'hostname',
+            'ipv4',
+            'ssh_keys',
+            'node',
+        ]));
         $wasRunning = $this->isRunning($node, $vmid);
 
         if ($wasRunning) {
