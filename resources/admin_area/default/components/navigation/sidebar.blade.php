@@ -180,6 +180,18 @@
                 </x-admin::navigation.sidebar-item>
                 @endperm
 
+                <!-- Data Export -->
+                @perm('admin.data-export')
+                <x-admin::navigation.sidebar-item
+                    :title="__('messages.data_export')"
+                    :href="route('admin.data-export.index')"
+                    :active="$activePage === 'data-export'">
+                    <x-slot name="icon">
+                        <x-admin::icon icon="database-export" outline/>
+                    </x-slot>
+                </x-admin::navigation.sidebar-item>
+                @endperm
+
                 <li class="nav-item mt-2 mb-1">
                     <div class="text-muted text-uppercase px-3 small">Application Settings</div>
                 </li>

@@ -126,6 +126,14 @@ Route::group(['prefix' => 'taxes'], function () {
     Route::get('/edit/{country_code}', [Admin\TaxesController::class, 'edit'])->name('taxes.edit');
 });
 
+Route::group(['prefix' => 'data-export'], function () {
+    Route::get('/', [Admin\DataExportController::class, 'index'])->name('data-export.index')->middleware('permission:admin.data-export');
+    Route::get('/{dataset}/download', [Admin\DataExportController::class, 'download'])
+        ->name('data-export.download')
+        ->middleware('permission:admin.data-export')
+        ->where('dataset', '[a-z0-9_]+');
+});
+
 Route::group(['prefix' => 'schedule-logs'], function () {
     Route::get('/', [Admin\ScheduleLogController::class, 'index'])->name('schedule-logs.index');
     Route::get('/view/{log}', [Admin\ScheduleLogController::class, 'view'])->name('schedule-logs.view');

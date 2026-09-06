@@ -305,4 +305,5 @@ return [
     'create_payment' => 'Create Payment',
     'connections' => 'Connections',
     'configs' => 'Configs',
+    'data_export' => 'Data Export',
 ];
