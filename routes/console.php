@@ -17,6 +17,9 @@ Schedule::command('cronjobs:orders:suspend-expired')->everyThreeHours();
 Schedule::command('cronjobs:orders:terminate-expired')->everyThreeHours();
 Schedule::command('cronjobs:report-active-check')->everyThreeHours()->withoutOverlapping();
 
+// Every minute
+Schedule::command('cronjobs:mass-mails:send')->everyMinute()->withoutOverlapping();
+
 // Every five minutes
 Schedule::command('server-connections:test')->everyFiveMinutes();
 

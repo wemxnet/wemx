@@ -83,6 +83,9 @@ Route::group(['prefix' => 'emails'], function () {
         ->name('emails.templates.edit')
         ->middleware('permission:admin.emails.templates')
         ->where('template', '[A-Za-z0-9._-]+');
+    Route::get('/mass-mails', [Admin\MassMailsController::class, 'index'])->name('emails.mass-mails.index')->middleware('permission:admin.emails.mass-mails');
+    Route::get('/mass-mails/create', [Admin\MassMailsController::class, 'create'])->name('emails.mass-mails.create')->middleware('permission:admin.emails.mass-mails');
+    Route::get('/mass-mails/{massMail}', [Admin\MassMailsController::class, 'show'])->name('emails.mass-mails.show')->middleware('permission:admin.emails.mass-mails');
 });
 
 Route::group(['prefix' => 'servers'], function () {

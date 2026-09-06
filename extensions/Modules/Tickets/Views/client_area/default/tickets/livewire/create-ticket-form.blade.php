@@ -142,9 +142,13 @@ new class extends Component
 
             <div>
                 <x-theme::form.label for="title" text="Subject"/>
-                <x-theme::form.input id="title" wire:model="title" placeholder="Briefly describe the issue"/>
+                <x-theme::form.input id="title" wire:model.live.debounce.400ms="title" placeholder="Briefly describe the issue"/>
                 @error('title') <x-theme::form.error :text="$message"/> @enderror
             </div>
+
+            @if(\Illuminate\Support\Facades\Route::has('knowledgebase.index'))
+                @livewire('client_area.default.knowledgebase.livewire.suggested-articles', ['query' => $title], key('kb-suggested'))
+            @endif
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>

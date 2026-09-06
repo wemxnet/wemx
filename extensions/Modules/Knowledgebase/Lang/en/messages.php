@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'knowledgebase' => 'Knowledgebase',
+    'articles' => 'Articles',
+    'article' => 'Article',
+    'categories' => 'Categories',
+    'category' => 'Category',
+    'search' => 'Search',
+    'search_placeholder' => 'Search documentation…',
+    'no_articles' => 'No articles yet.',
+    'no_categories' => 'No categories yet.',
+    'no_results' => 'No articles matched your search.',
+    'popular' => 'Popular articles',
+    'featured' => 'Featured',
+    'recently_updated' => 'Recently updated',
+    'related' => 'Related articles',
+    'was_this_helpful' => 'Was this article helpful?',
+    'yes' => 'Yes',
+    'no' => 'No',
+    'views' => 'views',
+    'updated' => 'Updated',
+    'sign_in_to_read' => 'Sign in to read this article',
+    'browse_docs' => 'Browse docs',
+    'on_this_page' => 'On this page',
+];
