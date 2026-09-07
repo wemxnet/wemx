@@ -668,6 +668,31 @@ BODY,
         ],
     ],
 
+    'server.cpanel.created' => [
+        'name' => 'cPanel account created',
+        'group' => 'Servers',
+        'description' => 'Sent when a cPanel hosting account is provisioned for an order.',
+        'subject' => 'Your hosting account is ready',
+        'body' => <<<'BODY'
+Your cPanel hosting account has been created and is ready to use.
+**Account details:**
+Domain: {{domain}}
+Username: {{username}}
+Password: {{password}}
+IP address: {{ip}}
+Nameservers: {{nameservers}}
+You can manage email, FTP, databases, and SSL from your order page.
+BODY,
+        'button_text' => 'Manage hosting',
+        'placeholders' => [
+            'domain' => 'Primary domain',
+            'username' => 'cPanel username',
+            'password' => 'cPanel password',
+            'ip' => 'Assigned IP address',
+            'nameservers' => 'Nameserver list',
+        ],
+    ],
+
     'server.pterodactyl.account_created' => [
         'name' => 'Pterodactyl account created',
         'group' => 'Servers',
