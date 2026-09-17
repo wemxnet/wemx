@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Actions\ServerConnectionActions;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ServerConnection extends Model
 {
@@ -43,9 +45,14 @@ class ServerConnection extends Model
         return $this->belongsTo(Server::class, 'extension_identifier', 'identifier');
     }
 
-    public static function actions(): \App\Actions\ServerConnectionActions
+    public function packages(): HasMany
     {
-        return new \App\Actions\ServerConnectionActions();
+        return $this->hasMany(Package::class, 'connection_id');
+    }
+
+    public static function actions(): ServerConnectionActions
+    {
+        return new ServerConnectionActions;
     }
 
     public function isHealthy(): bool

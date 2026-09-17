@@ -107,6 +107,19 @@ new class extends Component
         $this->redirect(route('admin.servers.connections.edit', $this->connectionId), true);
     }
 
+    public function deleteConnection()
+    {
+        $this->resetErrorBag();
+
+        ServerConnection::actions()->deleteServerConnectionAsAdmin([
+            'connection_id' => $this->connectionId,
+        ]);
+
+        return redirect()
+            ->route('admin.servers.connections')
+            ->with('success', 'Server connection deleted successfully');
+    }
+
     public function rendering(View $view)
     {
         if(!$this->connectionAlertsEmail) {
@@ -253,7 +266,18 @@ new class extends Component
         @endif
     </div>
     <div class="card-footer text-end">
+        <button
+            type="button"
+            class="btn btn-danger me-2"
+            wire:click="deleteConnection"
+            wire:confirm.prompt="Are you sure you want to delete this server connection? This cannot be undone. Enter the Connection ID to confirm|{{ $connectionId }}"
+        >
+            Delete Connection
+        </button>
         <button type="button" wire:click="updateConnection" class="btn btn-primary" @if($this->server ?? null AND $this->server->hasTestConnection() AND !$connectionSuccessful) disabled data-bs-toggle="tooltip" data-bs-placement="top" title="Tooltip on top" @endif>{{ __('messages.update') }}</button>
+        @error('connection_id')
+            <x-admin::form.error :message="$message" />
+        @enderror
     </div>
 
     <script>

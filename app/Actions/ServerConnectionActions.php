@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Models\ServerConnection;
 use App\Support\LicensePlanLimits;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -61,5 +62,39 @@ class ServerConnectionActions extends Action
         unset($validatedData['connection_id']);
 
         return $connection->update(self::omitNullValues($validatedData));
+    }
+
+    /**
+     * Delete a server connection as an admin.
+     *
+     * A connection can only be deleted once no packages reference it.
+     *
+     * @throws ValidationException
+     */
+    public static function deleteServerConnectionAsAdmin(array $input): bool
+    {
+        $validatedData = Validator::make($input, [
+            'connection_id' => ['required', 'integer', 'exists:server_connections,id'],
+        ])->validate();
+
+        $connection = ServerConnection::find($validatedData['connection_id']);
+
+        if (! $connection) {
+            throw ValidationException::withMessages([
+                'connection_id' => 'Connection not found',
+            ]);
+        }
+
+        return DB::transaction(function () use ($connection): bool {
+            $existingPackageIds = $connection->packages()->pluck('id');
+
+            if ($existingPackageIds->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'connection_id' => 'This server connection cannot be deleted while packages are using it. Open packages: #'.$existingPackageIds->implode(', #'),
+                ]);
+            }
+
+            return $connection->delete();
+        });
     }
 }
