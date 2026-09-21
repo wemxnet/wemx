@@ -60,7 +60,7 @@ class Server extends ServerExtension
     {
         $doesNotEndWithSlash = function ($attribute, $value, $fail) {
             if (is_string($value) && preg_match('/\/$/', $value)) {
-                $fail('Hostname must not end with a slash. Use https://pve.example.com');
+                $fail('Hostname must not end with a slash. Use https://pve.example.com or https://pve.example.com:8006');
             }
         };
 
@@ -68,30 +68,10 @@ class Server extends ServerExtension
             [
                 'key' => 'hostname',
                 'name' => 'Hostname',
-                'description' => 'Proxmox host without a trailing slash, for example https://pve.example.com',
+                'description' => 'Proxmox panel URL without a trailing slash. Include the port when needed, for example https://pve.example.com:8006 or https://pve.example.com',
                 'type' => 'text',
-                'default_value' => 'https://pve.example.com',
+                'default_value' => 'https://pve.example.com:8006',
                 'rules' => ['required', 'string', $doesNotEndWithSlash],
-            ],
-            [
-                'key' => 'port',
-                'name' => 'Port',
-                'description' => 'API port. Default is 8006.',
-                'type' => 'number',
-                'default_value' => 8006,
-                'rules' => ['required', 'numeric', 'min:1', 'max:65535'],
-            ],
-            [
-                'key' => 'auth_type',
-                'name' => 'Authentication',
-                'description' => 'API tokens are recommended for billing automation.',
-                'type' => 'select',
-                'options' => [
-                    'token' => 'API token',
-                    'password' => 'Username and password',
-                ],
-                'default_value' => 'token',
-                'rules' => ['required', 'in:token,password'],
             ],
             [
                 'key' => 'username',
@@ -102,25 +82,11 @@ class Server extends ServerExtension
                 'rules' => ['required', 'string'],
             ],
             [
-                'key' => 'token_id',
-                'name' => 'Token ID',
-                'description' => 'API token name. Required when using token authentication.',
-                'type' => 'text',
-                'rules' => ['nullable', 'string'],
-            ],
-            [
-                'key' => 'token_secret',
-                'name' => 'Token secret',
-                'description' => 'API token UUID. Required when using token authentication.',
-                'type' => 'password',
-                'rules' => ['nullable', 'string'],
-            ],
-            [
                 'key' => 'password',
                 'name' => 'Password',
-                'description' => 'Required only when using username and password authentication.',
+                'description' => 'Password for the Proxmox account above.',
                 'type' => 'password',
-                'rules' => ['nullable', 'string'],
+                'rules' => ['required', 'string'],
             ],
             [
                 'key' => 'verify_ssl',
@@ -163,14 +129,6 @@ class Server extends ServerExtension
                 'description' => 'Optional fallback addresses used when a package is set to pool mode. One IP or range per line, for example 192.168.1.10-192.168.1.20',
                 'type' => 'textarea',
                 'rules' => ['nullable', 'string'],
-            ],
-            [
-                'key' => 'vmid_start',
-                'name' => 'VMID start',
-                'description' => 'Lowest VMID WemX should request from the cluster.',
-                'type' => 'number',
-                'default_value' => 100,
-                'rules' => ['required', 'numeric', 'min:100'],
             ],
             [
                 'key' => 'debug_mode',

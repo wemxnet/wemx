@@ -207,6 +207,7 @@ new class extends Component
         $canManage = $order && $order->status === 'active';
         $account = $order?->getExternalUser();
         $password = $account?->password;
+        $ipv4 = $order->data['ipv4'] ?? ($usage['ipv4'] ?? null);
     @endphp
 
     @if($order)
@@ -299,7 +300,13 @@ new class extends Component
                 </x-theme::datagrid.item>
                 <x-theme::datagrid.item>
                     <x-slot:label>{{ __('server-proxmox::messages.ipv4') }}</x-slot:label>
-                    {{ $order->data['ipv4'] ?? __('server-proxmox::messages.dhcp') }}
+                    @if($ipv4)
+                        {{ $ipv4 }}
+                    @elseif($usage['running'] ?? false)
+                        {{ __('server-proxmox::messages.ipv4_pending') }}
+                    @else
+                        {{ __('server-proxmox::messages.dhcp') }}
+                    @endif
                 </x-theme::datagrid.item>
                 <x-theme::datagrid.item>
                     <x-slot:label>{{ __('server-proxmox::messages.username') }}</x-slot:label>

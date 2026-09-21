@@ -12,8 +12,12 @@ use App\Models\User;
 use Extensions\Servers\Proxmox\Server;
 use Extensions\Servers\Proxmox\Support\IpPool;
 use Extensions\Servers\Proxmox\Support\OsTemplates;
+use Extensions\Servers\Proxmox\Support\ProxmoxApi;
+use Extensions\Servers\Proxmox\Support\ProxmoxVmManager;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
@@ -129,12 +133,15 @@ class ProxmoxServerTest extends TestCase
         ]));
     }
 
-    public function test_connection_config_includes_token_and_node_settings(): void
+    public function test_connection_config_includes_credentials_and_node_settings(): void
     {
         $keys = collect((new Server)->setConfig())->pluck('key');
 
         $this->assertTrue($keys->contains('hostname'));
-        $this->assertTrue($keys->contains('token_secret'));
+        $this->assertTrue($keys->contains('username'));
+        $this->assertTrue($keys->contains('password'));
+        $this->assertFalse($keys->contains('auth_type'));
+        $this->assertFalse($keys->contains('token_secret'));
         $this->assertTrue($keys->contains('default_storage'));
         $this->assertTrue($keys->contains('ip_pool'));
     }
@@ -164,18 +171,84 @@ class ProxmoxServerTest extends TestCase
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/version'));
     }
 
+    public function test_api_base_url_supports_port_in_hostname(): void
+    {
+        $api = ProxmoxApi::make([
+            'hostname' => 'https://pve.example.com:8006',
+        ]);
+
+        $this->assertSame('https://pve.example.com:8006/api2/json', $api->baseUrl());
+    }
+
+    public function test_api_base_url_omits_port_when_not_configured(): void
+    {
+        $api = ProxmoxApi::make([
+            'hostname' => 'https://pve.example.com',
+        ]);
+
+        $this->assertSame('https://pve.example.com/api2/json', $api->baseUrl());
+    }
+
     public function test_event_add_to_cart_rejects_an_offline_cluster(): void
     {
-        Http::fake([
+        Http::fake(array_merge($this->authTicketFake(), [
             'https://pve.example.com:8006/api2/json/nodes' => Http::response(['data' => []], 200),
             'https://pve.example.com:8006/api2/json/cluster/resources*' => Http::response(['data' => []], 200),
             'https://pve.example.com:8006/api2/json/nodes/pve/qemu/9000/config' => Http::response(['data' => []], 200),
-        ]);
+        ]));
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('No Proxmox nodes are available.');
 
         Server::eventAddToCart($this->package, ['os_template' => 'ubuntu-24.04']);
+    }
+
+    public function test_event_add_to_cart_surfaces_specific_template_error(): void
+    {
+        Http::fake(array_merge($this->authTicketFake(), [
+            'https://pve.example.com:8006/api2/json/nodes' => Http::response(['data' => [
+                ['node' => 'pve', 'status' => 'online'],
+            ]], 200),
+            'https://pve.example.com:8006/api2/json/cluster/resources*' => Http::response(['data' => [
+                ['node' => 'pve', 'type' => 'node', 'maxmem' => 32 * 1024 ** 3, 'mem' => 0, 'maxdisk' => 500 * 1024 ** 3, 'disk' => 0],
+            ]], 200),
+            'https://pve.example.com:8006/api2/json/nodes/pve/qemu/9000/config' => Http::response(['data' => null], 500),
+        ]));
+
+        try {
+            Server::eventAddToCart($this->package, ['os_template' => 'ubuntu-24.04']);
+            $this->fail('Expected exception was not thrown.');
+        } catch (\Exception $exception) {
+            $this->assertStringContainsString('Ubuntu 24.04 LTS', $exception->getMessage());
+            $this->assertStringContainsString('VMID 9000', $exception->getMessage());
+            $this->assertStringContainsString('node [pve]', $exception->getMessage());
+            $this->assertStringContainsString('template VM may not exist on that node', $exception->getMessage());
+            $this->assertStringNotContainsString('{"data":null}', $exception->getMessage());
+        }
+    }
+
+    public function test_event_add_to_cart_surfaces_proxmox_error_details(): void
+    {
+        Http::fake(array_merge($this->authTicketFake(), [
+            'https://pve.example.com:8006/api2/json/nodes' => Http::response(['data' => [
+                ['node' => 'pve', 'status' => 'online'],
+            ]], 200),
+            'https://pve.example.com:8006/api2/json/cluster/resources*' => Http::response(['data' => [
+                ['node' => 'pve', 'type' => 'node', 'maxmem' => 32 * 1024 ** 3, 'mem' => 0, 'maxdisk' => 500 * 1024 ** 3, 'disk' => 0],
+            ]], 200),
+            'https://pve.example.com:8006/api2/json/nodes/pve/qemu/9000/config' => Http::response([
+                'data' => null,
+                'errors' => ['vmid' => 'Configuration file \'nodes/pve/qemu-server/9000.conf\' does not exist'],
+            ], 500),
+        ]));
+
+        try {
+            Server::eventAddToCart($this->package, ['os_template' => 'ubuntu-24.04']);
+            $this->fail('Expected exception was not thrown.');
+        } catch (\Exception $exception) {
+            $this->assertStringContainsString('9000.conf', $exception->getMessage());
+            $this->assertStringContainsString('Ubuntu 24.04 LTS', $exception->getMessage());
+        }
     }
 
     public function test_create_clones_the_template_and_stores_vm_details(): void
@@ -197,6 +270,7 @@ class ProxmoxServerTest extends TestCase
         $this->assertTrue($order->hasExternalUser());
         $this->assertSame('root', $order->getExternalUser()->username);
         $this->assertNotSame('unknown', $order->getExternalUser()->password);
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9]+$/', $order->getExternalUser()->password);
 
         $this->assertDatabaseHas('emails', [
             'user_id' => $this->customer->id,
@@ -232,6 +306,18 @@ class ProxmoxServerTest extends TestCase
         (new Server)->create($order, $this->connection);
 
         $this->assertSame('10.0.0.21', $order->fresh()->data['ipv4']);
+    }
+
+    public function test_status_discovers_guest_ipv4_for_dhcp_vms(): void
+    {
+        $this->fakeProxmox(running: true);
+
+        $order = $this->provisionedOrder();
+
+        $status = ProxmoxVmManager::for($this->connection)->status($order);
+
+        $this->assertSame('192.168.1.50', $status['ipv4']);
+        $this->assertSame('192.168.1.50', $order->fresh()->data['ipv4']);
     }
 
     public function test_suspend_stops_the_vm_and_unsuspend_starts_it(): void
@@ -433,18 +519,27 @@ class ProxmoxServerTest extends TestCase
     protected function credentials(): array
     {
         return [
-            'hostname' => 'https://pve.example.com',
-            'port' => 8006,
-            'auth_type' => 'token',
-            'username' => 'wemx@pve',
-            'token_id' => 'billing',
-            'token_secret' => '11111111-2222-3333-4444-555555555555',
+            'hostname' => 'https://pve.example.com:8006',
+            'username' => 'root@pam',
+            'password' => 'secret-password',
             'verify_ssl' => '0',
             'default_node' => 'pve',
             'default_storage' => 'local-lvm',
             'default_bridge' => 'vmbr0',
-            'vmid_start' => 100,
             'debug_mode' => '0',
+        ];
+    }
+
+    /**
+     * @return array<string, PromiseInterface|Response>
+     */
+    protected function authTicketFake(): array
+    {
+        return [
+            'https://pve.example.com:8006/api2/json/access/ticket' => Http::response(['data' => [
+                'ticket' => 'PVEAuthCookie',
+                'CSRFPreventionToken' => 'csrf-token',
+            ]], 200),
         ];
     }
 
@@ -508,6 +603,13 @@ class ProxmoxServerTest extends TestCase
                 $state->running = true;
             }
 
+            if (str_ends_with($path, '/access/ticket')) {
+                return Http::response(['data' => [
+                    'ticket' => 'PVEAuthCookie',
+                    'CSRFPreventionToken' => 'csrf-token',
+                ]], 200);
+            }
+
             if (str_ends_with($path, '/version')) {
                 return Http::response(['data' => ['version' => '8.3']], 200);
             }
@@ -539,6 +641,23 @@ class ProxmoxServerTest extends TestCase
                 return Http::response(['data' => [
                     'scsi0' => 'local-lvm:vm-9000-disk-0,size=10G',
                     'name' => 'ubuntu-template',
+                ]], 200);
+            }
+
+            if (str_contains($path, '/agent/network-get-interfaces')) {
+                return Http::response(['data' => [
+                    [
+                        'name' => 'lo',
+                        'ip-addresses' => [
+                            ['ip-address-type' => 'ipv4', 'ip-address' => '127.0.0.1', 'prefix' => 8],
+                        ],
+                    ],
+                    [
+                        'name' => 'eth0',
+                        'ip-addresses' => [
+                            ['ip-address-type' => 'ipv4', 'ip-address' => '192.168.1.50', 'prefix' => 24],
+                        ],
+                    ],
                 ]], 200);
             }
 

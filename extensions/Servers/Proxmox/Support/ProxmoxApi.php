@@ -240,7 +240,10 @@ class ProxmoxApi
         throw new Exception('Timed out waiting for the Proxmox task to finish.');
     }
 
-    public function baseUrl(): string
+    /**
+     * @return array{scheme: string, authority: string}
+     */
+    public function panelBase(): array
     {
         $hostname = rtrim((string) ($this->credentials['hostname'] ?? ''), '/');
 
@@ -254,10 +257,27 @@ class ProxmoxApi
 
         $parts = parse_url($hostname);
         $scheme = $parts['scheme'] ?? 'https';
-        $host = $parts['host'] ?? $hostname;
-        $port = $parts['port'] ?? (int) ($this->credentials['port'] ?? 8006);
+        $host = $parts['host'] ?? ltrim((string) ($parts['path'] ?? ''), '/');
 
-        return "{$scheme}://{$host}:{$port}/api2/json";
+        if ($host === '') {
+            throw new Exception('Proxmox hostname is not configured.');
+        }
+
+        $authority = isset($parts['port'])
+            ? "{$host}:{$parts['port']}"
+            : $host;
+
+        return [
+            'scheme' => $scheme,
+            'authority' => $authority,
+        ];
+    }
+
+    public function baseUrl(): string
+    {
+        $panel = $this->panelBase();
+
+        return "{$panel['scheme']}://{$panel['authority']}/api2/json";
     }
 
     /**
@@ -297,13 +317,7 @@ class ProxmoxApi
             ->retry(2, 250, throw: false)
             ->withOptions(['verify' => $verifySsl]);
 
-        if (($this->credentials['auth_type'] ?? 'token') === 'password') {
-            return $this->withTicket($request);
-        }
-
-        return $request->withHeaders([
-            'Authorization' => 'PVEAPIToken='.$this->apiToken(),
-        ]);
+        return $this->withTicket($request);
     }
 
     protected function withTicket(PendingRequest $request): PendingRequest
@@ -326,7 +340,7 @@ class ProxmoxApi
         $password = $this->credentials['password'] ?? '';
 
         if ($username === '' || $password === '') {
-            throw new Exception('Proxmox username and password are required for password authentication.');
+            throw new Exception('Proxmox username and password are required.');
         }
 
         $verifySsl = (string) ($this->credentials['verify_ssl'] ?? '0') === '1';
@@ -354,23 +368,6 @@ class ProxmoxApi
         return $data;
     }
 
-    protected function apiToken(): string
-    {
-        $username = (string) ($this->credentials['username'] ?? '');
-        $tokenId = (string) ($this->credentials['token_id'] ?? '');
-        $tokenSecret = (string) ($this->credentials['token_secret'] ?? $this->credentials['api_token'] ?? '');
-
-        if ($tokenSecret !== '' && str_contains($tokenSecret, '=')) {
-            return $tokenSecret;
-        }
-
-        if ($username === '' || $tokenId === '' || $tokenSecret === '') {
-            throw new Exception('Proxmox API token credentials are incomplete. Provide username, token ID, and token secret.');
-        }
-
-        return "{$username}!{$tokenId}={$tokenSecret}";
-    }
-
     protected function data(Response $response): mixed
     {
         return $response->json('data');
@@ -378,19 +375,93 @@ class ProxmoxApi
 
     protected function errorMessage(string $endpoint, Response $response): string
     {
+        $status = $response->status();
+        $message = $this->extractErrorMessage($response);
+        $endpointLabel = $this->endpointLabel($endpoint);
+        $details = $message !== ''
+            ? $message
+            : $this->statusHint($status, $endpoint);
+
+        return "Proxmox {$endpointLabel} failed (HTTP {$status}): {$details}";
+    }
+
+    protected function extractErrorMessage(Response $response): string
+    {
         $body = $response->json();
-        $message = data_get($body, 'errors') ?: data_get($body, 'message') ?: $response->body();
 
-        if (is_array($message)) {
-            $message = collect($message)->map(fn ($value, $key) => is_string($key) ? "{$key}: {$value}" : $value)->implode('; ');
+        if (! is_array($body)) {
+            $raw = trim($response->body());
+
+            if ($raw === '' || in_array($raw, ['{"data":null}', '{"data": null}'], true)) {
+                return '';
+            }
+
+            return Str::limit($raw, 500);
         }
 
-        $message = Str::limit(trim((string) $message), 500);
+        $errors = data_get($body, 'errors');
 
-        if ((string) ($this->credentials['debug_mode'] ?? '0') === '1') {
-            return "Proxmox API request to {$endpoint} failed ({$response->status()}): {$message}";
+        if (is_array($errors) && $errors !== []) {
+            return Str::limit(collect($errors)->map(function ($value, $key) {
+                if (is_array($value)) {
+                    $details = collect($value)->flatten()->filter()->implode(', ');
+
+                    return is_string($key) ? "{$key}: {$details}" : $details;
+                }
+
+                return is_string($key) ? "{$key}: {$value}" : (string) $value;
+            })->implode('; '), 500);
         }
 
-        return "Proxmox API request failed ({$response->status()}): {$message}";
+        foreach (['message', 'data'] as $field) {
+            $value = data_get($body, $field);
+
+            if (is_string($value) && trim($value) !== '') {
+                return Str::limit(trim($value), 500);
+            }
+        }
+
+        return '';
+    }
+
+    protected function endpointLabel(string $endpoint): string
+    {
+        if (preg_match('#^/nodes/([^/]+)/qemu/(\d+)/config$#', $endpoint, $matches)) {
+            return "template lookup on node [{$matches[1]}] for VMID [{$matches[2]}]";
+        }
+
+        if (preg_match('#^/nodes/([^/]+)/qemu/(\d+)/#', $endpoint, $matches)) {
+            return "virtual machine request on node [{$matches[1]}] for VMID [{$matches[2]}]";
+        }
+
+        if ($endpoint === '/nodes') {
+            return 'node list request';
+        }
+
+        if ($endpoint === '/cluster/resources') {
+            return 'cluster resource request';
+        }
+
+        if ($endpoint === '/version') {
+            return 'version request';
+        }
+
+        if ($endpoint === '/access/ticket') {
+            return 'authentication request';
+        }
+
+        return 'API request to ['.$endpoint.']';
+    }
+
+    protected function statusHint(int $status, string $endpoint): string
+    {
+        return match (true) {
+            $status === 401 => 'Authentication failed. Check the Proxmox username and password.',
+            $status === 403 => 'Access denied. The Proxmox account may not have permission for this action.',
+            $status === 404 => 'The requested resource was not found on the Proxmox cluster.',
+            $status === 500 && str_contains($endpoint, '/qemu/') && str_contains($endpoint, '/config') => 'The template VM may not exist on that node, or the Proxmox account may lack permission to read it.',
+            $status >= 500 => 'The Proxmox panel returned an unexpected server error.',
+            default => 'The Proxmox panel rejected the request.',
+        };
     }
 }

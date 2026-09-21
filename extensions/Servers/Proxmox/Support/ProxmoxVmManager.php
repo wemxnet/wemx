@@ -31,7 +31,15 @@ class ProxmoxVmManager
         $template = $this->resolveTemplate($package, $configOptions);
         $node = $this->selectNode($plan['node'], (int) $plan['memory'], (int) $plan['disk']);
 
-        $this->api->qemuConfig($node, $template['vmid']);
+        try {
+            $this->api->qemuConfig($node, $template['vmid']);
+        } catch (Exception $exception) {
+            throw new Exception(
+                "Unable to verify the selected OS template [{$template['label']}] (VMID {$template['vmid']}) on Proxmox node [{$node}]. {$exception->getMessage()}",
+                $exception->getCode(),
+                $exception
+            );
+        }
     }
 
     /**
@@ -305,13 +313,24 @@ class ProxmoxVmManager
         $disk = (int) ($status['disk'] ?? 0);
         $cpuFraction = (float) ($status['cpu'] ?? 0);
         $cpus = max(1, (int) ($status['cpus'] ?? 1));
+        $running = ($status['status'] ?? null) === 'running';
+        $ipv4 = $order->data['ipv4'] ?? null;
+
+        if ($running && empty($ipv4)) {
+            $discoveredIpv4 = $this->discoverGuestIpv4($node, $vmid);
+
+            if ($discoveredIpv4) {
+                $ipv4 = $discoveredIpv4;
+                $this->persistDiscoveredIpv4($order, $discoveredIpv4);
+            }
+        }
 
         return [
             'vmid' => $vmid,
             'node' => $node,
             'status' => $status['status'] ?? 'unknown',
             'qmpstatus' => $status['qmpstatus'] ?? ($status['status'] ?? 'unknown'),
-            'running' => ($status['status'] ?? null) === 'running',
+            'running' => $running,
             'uptime' => (int) ($status['uptime'] ?? 0),
             'cpu_percent' => round($cpuFraction * 100, 1),
             'cpus' => $cpus,
@@ -323,7 +342,71 @@ class ProxmoxVmManager
             'disk_percent' => round(($disk / $maxDisk) * 100, 1),
             'net_in' => (int) ($status['netin'] ?? 0),
             'net_out' => (int) ($status['netout'] ?? 0),
+            'ipv4' => $ipv4,
         ];
+    }
+
+    public function discoverGuestIpv4(string $node, int $vmid): ?string
+    {
+        try {
+            $interfaces = $this->api->guestNetworkInterfaces($node, $vmid);
+        } catch (Exception) {
+            return null;
+        }
+
+        if (! is_array($interfaces)) {
+            return null;
+        }
+
+        foreach ($interfaces as $interface) {
+            if (! is_array($interface)) {
+                continue;
+            }
+
+            $name = strtolower((string) ($interface['name'] ?? ''));
+
+            if ($name === 'lo' || str_starts_with($name, 'docker')) {
+                continue;
+            }
+
+            foreach ($interface['ip-addresses'] ?? [] as $address) {
+                if (! is_array($address)) {
+                    continue;
+                }
+
+                if (($address['ip-address-type'] ?? null) !== 'ipv4') {
+                    continue;
+                }
+
+                $ip = (string) ($address['ip-address'] ?? '');
+
+                if ($this->isUsableGuestIpv4($ip)) {
+                    return $ip;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function isUsableGuestIpv4(string $ip): bool
+    {
+        if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return false;
+        }
+
+        return ! str_starts_with($ip, '127.') && ! str_starts_with($ip, '169.254.');
+    }
+
+    protected function persistDiscoveredIpv4(Order $order, string $ipv4): void
+    {
+        if (($order->data['ipv4'] ?? null) === $ipv4) {
+            return;
+        }
+
+        $order->update([
+            'data' => array_merge($order->data ?? [], ['ipv4' => $ipv4]),
+        ]);
     }
 
     /**
@@ -379,16 +462,9 @@ class ProxmoxVmManager
             'websocket' => 1,
         ]);
 
-        $hostname = rtrim((string) ($this->connection->config['hostname'] ?? ''), '/');
-        $port = $this->connection->config['port'] ?? 8006;
-
-        if (! str_starts_with($hostname, 'http://') && ! str_starts_with($hostname, 'https://')) {
-            $hostname = 'https://'.$hostname;
-        }
-
-        $parts = parse_url($hostname);
-        $consoleHost = ($parts['host'] ?? $hostname).':'.($parts['port'] ?? $port);
-        $scheme = ($parts['scheme'] ?? 'https') === 'http' ? 'http' : 'https';
+        $panel = ProxmoxApi::fromConnection($this->connection)->panelBase();
+        $consoleHost = $panel['authority'];
+        $scheme = $panel['scheme'] === 'http' ? 'http' : 'https';
         $ticket = $proxy['ticket'] ?? '';
 
         return [
@@ -581,9 +657,7 @@ class ProxmoxVmManager
 
     protected function nextVmid(): int
     {
-        $start = (int) ($this->connection->config['vmid_start'] ?? 100);
-
-        return $this->api->nextId($start > 0 ? $start : null);
+        return $this->api->nextId();
     }
 
     /**
@@ -611,7 +685,12 @@ class ProxmoxVmManager
             return $existing;
         }
 
-        return Str::password(16);
+        return $this->generatePassword();
+    }
+
+    protected function generatePassword(int $length = 16): string
+    {
+        return Str::password($length, letters: true, numbers: true, symbols: false);
     }
 
     /**

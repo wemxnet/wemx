@@ -25,6 +25,7 @@ return [
     'vmid' => 'VMID',
     'node' => 'Node',
     'dhcp' => 'Assigned by DHCP',
+    'ipv4_pending' => 'Detecting address…',
     'power' => 'Power',
     'start' => 'Start',
     'shutdown' => 'Shutdown',

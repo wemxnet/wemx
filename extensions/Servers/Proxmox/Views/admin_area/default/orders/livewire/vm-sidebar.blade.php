@@ -44,6 +44,7 @@ new class extends Component
     $order = $this->order;
     $usage = $this->usage;
     $account = $order?->getExternalUser();
+    $ipv4 = $order->data['ipv4'] ?? ($usage['ipv4'] ?? null);
 @endphp
 
 @if($order)
@@ -71,7 +72,15 @@ new class extends Component
                 </div>
                 <div class="datagrid-item">
                     <div class="datagrid-title">{{ __('server-proxmox::messages.ipv4') }}</div>
-                    <div class="datagrid-content">{{ $order->data['ipv4'] ?? __('server-proxmox::messages.dhcp') }}</div>
+                    <div class="datagrid-content">
+                        @if($ipv4)
+                            {{ $ipv4 }}
+                        @elseif($usage['running'] ?? false)
+                            {{ __('server-proxmox::messages.ipv4_pending') }}
+                        @else
+                            {{ __('server-proxmox::messages.dhcp') }}
+                        @endif
+                    </div>
                 </div>
                 <div class="datagrid-item">
                     <div class="datagrid-title">{{ __('server-proxmox::messages.vmid') }}</div>
