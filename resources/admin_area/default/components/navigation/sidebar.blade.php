@@ -311,19 +311,6 @@
                     <div class="text-muted text-uppercase px-3 small">Third Party</div>
                 </li>
 
-                {{-- TEMPORARY: Marketplace sidebar entry disabled — uncomment to restore.
-                @perm('admin.marketplace.index')
-                <x-admin::navigation.sidebar-item
-                    title="Marketplace"
-                    :href="route('admin.marketplace.index')"
-                    :active="$activePage === 'marketplace'">
-                    <x-slot name="icon">
-                        <x-admin::icon icon="plug" outline/>
-                    </x-slot>
-                </x-admin::navigation.sidebar-item>
-                @endperm
-                --}}
-
                 <!-- Installed Extensions -->
                 @perm('admin.extensions.index')
                 <x-admin::navigation.sidebar-item

@@ -62,11 +62,6 @@ Route::group(['prefix' => 'packages'], function () {
     Route::get('/edit/{package:id}', [Admin\PackagesController::class, 'edit'])->name('packages.edit');
 });
 
-// TEMPORARY: Admin marketplace disabled — uncomment to restore.
-// Route::group(['prefix' => 'marketplace'], function () {
-//     Route::get('/', [Admin\MarketplaceController::class, 'index'])->name('marketplace.index');
-// });
-
 Route::group(['prefix' => 'gateways'], function () {
     Route::get('/', [Admin\GatewaysController::class, 'index'])->name('gateways.index');
     Route::get('/configs/', [Admin\GatewaysController::class, 'configs'])->name('gateways.configs.index');
