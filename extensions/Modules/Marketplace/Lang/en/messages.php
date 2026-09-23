@@ -12,6 +12,7 @@ return [
     'my_resources' => 'My Resources',
     'gateways' => 'Payment methods',
     'featured' => 'Featured',
+    'official' => 'Official',
     'popular' => 'Popular',
     'free' => 'Free',
     'pending_approval' => 'This resource is pending approval by an administrator. It will appear in the marketplace after it is reviewed.',

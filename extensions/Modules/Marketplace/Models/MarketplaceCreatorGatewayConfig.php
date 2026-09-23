@@ -9,6 +9,7 @@ use Extensions\Modules\Marketplace\Gateways\CreatorGatewayRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MarketplaceCreatorGatewayConfig extends Model
@@ -51,7 +52,17 @@ class MarketplaceCreatorGatewayConfig extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function resources(): HasMany
+    public function resources(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            MarketplaceResource::class,
+            'marketplace_resource_gateways',
+            'gateway_config_id',
+            'resource_id',
+        )->withTimestamps();
+    }
+
+    public function legacyResources(): HasMany
     {
         return $this->hasMany(MarketplaceResource::class, 'gateway_config_id');
     }

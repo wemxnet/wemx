@@ -34,10 +34,12 @@ class MarketplaceResourceActions extends Action
 
         $icon = $this->storeIcon($validated['icon'] ?? null);
 
+        $gatewayIds = $this->normalizeGatewayIds($validated);
+
         $resource = MarketplaceResource::create(self::omitNullValues([
             'user_id' => $user->id,
             'category_id' => $category->id,
-            'gateway_config_id' => $validated['gateway_config_id'] ?? null,
+            'gateway_config_id' => $gatewayIds[0] ?? null,
             'name' => $validated['name'],
             'slug' => MarketplaceResource::generateSlug($validated['slug'] ?? $validated['name']),
             'short_description' => $validated['short_description'],
@@ -63,7 +65,13 @@ class MarketplaceResourceActions extends Action
             'invited_by' => $user->id,
         ]);
 
-        $resource = $resource->fresh(['category', 'author', 'teamMembers.user']);
+        if ($gatewayIds !== []) {
+            $this->assertGatewaysBelongToOwner($resource, $gatewayIds);
+            $resource->gatewayConfigs()->sync($gatewayIds);
+            $resource->update(['gateway_config_id' => $gatewayIds[0]]);
+        }
+
+        $resource = $resource->fresh(['category', 'author', 'teamMembers.user', 'gatewayConfigs']);
         MarketplaceNotifier::resourcePending($resource);
 
         return $resource;
@@ -83,15 +91,10 @@ class MarketplaceResourceActions extends Action
             MarketplaceCategory::query()->visible()->findOrFail($validated['category_id']);
         }
 
-        if (isset($validated['gateway_config_id'])) {
-            $this->assertGatewayBelongsToOwner($resource, (int) $validated['gateway_config_id']);
-        }
-
         $payload = [];
 
         foreach ([
             'category_id',
-            'gateway_config_id',
             'name',
             'short_description',
             'description',
@@ -108,6 +111,9 @@ class MarketplaceResourceActions extends Action
                 $payload[$key] = $validated[$key];
             }
         }
+
+        $syncGateways = array_key_exists('gateway_config_ids', $validated)
+            || array_key_exists('gateway_config_id', $validated);
 
         if (isset($validated['name']) || isset($validated['slug'])) {
             $payload['slug'] = MarketplaceResource::generateSlug(
@@ -136,7 +142,12 @@ class MarketplaceResourceActions extends Action
         }
 
         $resource->update(self::omitNullValues($payload));
-        $resource = $resource->fresh(['category', 'author', 'teamMembers.user']);
+
+        if ($syncGateways) {
+            $this->syncResourceGateways($resource, $this->normalizeGatewayIds($validated));
+        }
+
+        $resource = $resource->fresh(['category', 'author', 'teamMembers.user', 'gatewayConfigs']);
 
         if ($resubmitted) {
             MarketplaceNotifier::resourcePending($resource);
@@ -153,14 +164,35 @@ class MarketplaceResourceActions extends Action
             'gateway_config_id' => ['required', 'integer', 'exists:marketplace_creator_gateway_configs,id'],
         ])->validate();
 
+        return $this->syncGateways([
+            'user_id' => $validated['user_id'],
+            'resource_id' => $validated['resource_id'],
+            'gateway_config_ids' => [(int) $validated['gateway_config_id']],
+        ]);
+    }
+
+    public function syncGateways(array $input): MarketplaceResource
+    {
+        $validated = Validator::make($input, [
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+            'gateway_config_ids' => ['present', 'array'],
+            'gateway_config_ids.*' => ['integer', 'exists:marketplace_creator_gateway_configs,id'],
+        ])->validate();
+
         $user = $this->user((int) $validated['user_id']);
         $resource = MarketplaceResource::findOrFail($validated['resource_id']);
         $this->assertCanManageResource($user, $resource, TeamRole::Manager);
-        $this->assertGatewayBelongsToOwner($resource, (int) $validated['gateway_config_id']);
 
-        $resource->update(['gateway_config_id' => $validated['gateway_config_id']]);
+        $gatewayIds = collect($validated['gateway_config_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
-        return $resource->fresh();
+        $this->syncResourceGateways($resource, $gatewayIds);
+
+        return $resource->fresh(['gatewayConfigs']);
     }
 
     public function approveAsAdmin(array $input): MarketplaceResource
@@ -265,13 +297,108 @@ class MarketplaceResourceActions extends Action
         return $resource;
     }
 
+    public function setOfficialAsAdmin(array $input): MarketplaceResource
+    {
+        $validated = Validator::make($input, [
+            'admin_user_id' => ['required', 'integer', 'exists:users,id'],
+            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+            'is_official' => ['required', 'boolean'],
+        ])->validate();
+
+        $this->staffUser((int) $validated['admin_user_id']);
+        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
+
+        $resource->update([
+            'is_official' => $validated['is_official'],
+        ]);
+
+        return $resource->fresh(['category', 'author', 'teamMembers.user']);
+    }
+
+    public function setDisabledAsCreator(array $input): MarketplaceResource
+    {
+        $validated = Validator::make($input, [
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+            'is_disabled' => ['required', 'boolean'],
+        ])->validate();
+
+        $user = $this->user((int) $validated['user_id']);
+        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
+        $this->assertCanManageResource($user, $resource, TeamRole::Manager);
+
+        if ($resource->status !== ResourceStatus::Approved) {
+            throw ValidationException::withMessages([
+                'is_disabled' => 'Only approved resources can be disabled or re-enabled.',
+            ]);
+        }
+
+        $resource->update([
+            'is_disabled' => $validated['is_disabled'],
+        ]);
+
+        return $resource->fresh(['category', 'author', 'teamMembers.user']);
+    }
+
+    public function deleteAsCreator(array $input): bool
+    {
+        $validated = Validator::make($input, [
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+        ])->validate();
+
+        $user = $this->user((int) $validated['user_id']);
+        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
+        $this->assertCanManageResource($user, $resource, TeamRole::Owner);
+        $this->assertResourceCanBeDeleted($resource);
+
+        return $this->destroyResource($resource);
+    }
+
+    public function deleteAsAdmin(array $input): bool
+    {
+        $validated = Validator::make($input, [
+            'admin_user_id' => ['required', 'integer', 'exists:users,id'],
+            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+        ])->validate();
+
+        $this->staffUser((int) $validated['admin_user_id'], 'admin.marketplace.delete');
+
+        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
+        $this->assertResourceCanBeDeleted($resource);
+
+        return $this->destroyResource($resource);
+    }
+
+    protected function destroyResource(MarketplaceResource $resource): bool
+    {
+        $this->deleteIcon($resource);
+
+        foreach ($resource->versions as $version) {
+            MarketplaceResourceVersionActions::deleteStoredFile($version);
+        }
+
+        return (bool) $resource->delete();
+    }
+
+    protected function assertResourceCanBeDeleted(MarketplaceResource $resource): void
+    {
+        if ($resource->canBeDeleted()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'resource_id' => 'Paid resources with purchases cannot be deleted.',
+        ]);
+    }
+
     public function addTeamMember(array $input): MarketplaceResourceTeamMember
     {
         $validated = Validator::make($input, [
             'actor_user_id' => ['required', 'integer', 'exists:users,id'],
             'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
             'user_id' => ['required', 'integer', 'exists:users,id'],
-            'role' => ['required', Rule::enum(TeamRole::class)],
+            'role' => ['sometimes', Rule::in([TeamRole::Manager->value])],
         ])->validate();
 
         $actor = $this->user((int) $validated['actor_user_id']);
@@ -287,21 +414,13 @@ class MarketplaceResourceActions extends Action
             ]);
         }
 
-        $role = TeamRole::from($validated['role']);
-
-        if ($role === TeamRole::Owner) {
-            throw ValidationException::withMessages([
-                'role' => 'Ownership cannot be assigned this way.',
-            ]);
-        }
-
         $member = MarketplaceResourceTeamMember::query()->updateOrCreate(
             [
                 'resource_id' => $resource->id,
                 'user_id' => $validated['user_id'],
             ],
             [
-                'role' => $role,
+                'role' => TeamRole::Manager,
                 'invited_by' => $actor->id,
             ]
         );
@@ -361,25 +480,6 @@ class MarketplaceResourceActions extends Action
         return $resource->fresh();
     }
 
-    public function deleteAsAdmin(array $input): bool
-    {
-        $validated = Validator::make($input, [
-            'admin_user_id' => ['required', 'integer', 'exists:users,id'],
-            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
-        ])->validate();
-
-        $this->staffUser((int) $validated['admin_user_id'], 'admin.marketplace.delete');
-
-        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
-        $this->deleteIcon($resource);
-
-        foreach ($resource->versions as $version) {
-            MarketplaceResourceVersionActions::deleteStoredFile($version);
-        }
-
-        return (bool) $resource->delete();
-    }
-
     /**
      * @return array<string, mixed>
      */
@@ -391,6 +491,8 @@ class MarketplaceResourceActions extends Action
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'category_id' => [$required, 'integer', 'exists:marketplace_categories,id'],
             'gateway_config_id' => ['nullable', 'integer', 'exists:marketplace_creator_gateway_configs,id'],
+            'gateway_config_ids' => ['sometimes', 'array'],
+            'gateway_config_ids.*' => ['integer', 'exists:marketplace_creator_gateway_configs,id'],
             'name' => [$required, 'string', 'max:120'],
             'slug' => ['nullable', 'string', 'max:140'],
             'short_description' => [$required, 'string', 'max:240'],
@@ -432,18 +534,63 @@ class MarketplaceResourceActions extends Action
         }
     }
 
-    protected function assertGatewayBelongsToOwner(MarketplaceResource $resource, int $gatewayConfigId): void
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return list<int>
+     */
+    protected function normalizeGatewayIds(array $validated): array
     {
-        $config = MarketplaceCreatorGatewayConfig::query()
-            ->where('id', $gatewayConfigId)
+        if (array_key_exists('gateway_config_ids', $validated)) {
+            return collect($validated['gateway_config_ids'] ?? [])
+                ->filter(fn ($id) => $id !== null && $id !== '')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if (! empty($validated['gateway_config_id'])) {
+            return [(int) $validated['gateway_config_id']];
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  list<int>  $gatewayIds
+     */
+    protected function syncResourceGateways(MarketplaceResource $resource, array $gatewayIds): void
+    {
+        $this->assertGatewaysBelongToOwner($resource, $gatewayIds);
+
+        $resource->gatewayConfigs()->sync($gatewayIds);
+        $resource->update(['gateway_config_id' => $gatewayIds[0] ?? null]);
+    }
+
+    /**
+     * @param  list<int>  $gatewayIds
+     */
+    protected function assertGatewaysBelongToOwner(MarketplaceResource $resource, array $gatewayIds): void
+    {
+        if ($gatewayIds === []) {
+            return;
+        }
+
+        $ownedCount = MarketplaceCreatorGatewayConfig::query()
+            ->whereIn('id', $gatewayIds)
             ->where('user_id', $resource->user_id)
             ->where('is_enabled', true)
-            ->first();
+            ->count();
 
-        if (! $config) {
+        if ($ownedCount !== count($gatewayIds)) {
             throw ValidationException::withMessages([
-                'gateway_config_id' => 'Select a payment method owned by the resource creator.',
+                'gateway_config_ids' => 'Select payment methods owned by the resource creator.',
             ]);
         }
+    }
+
+    protected function assertGatewayBelongsToOwner(MarketplaceResource $resource, int $gatewayConfigId): void
+    {
+        $this->assertGatewaysBelongToOwner($resource, [$gatewayConfigId]);
     }
 }

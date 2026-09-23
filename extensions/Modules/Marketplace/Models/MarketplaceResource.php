@@ -11,6 +11,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -41,6 +42,8 @@ class MarketplaceResource extends Model
         'status',
         'rejection_reason',
         'is_featured',
+        'is_official',
+        'is_disabled',
         'featured_until',
         'views_count',
         'downloads_count',
@@ -59,6 +62,8 @@ class MarketplaceResource extends Model
         'available_on_integrated_marketplace' => true,
         'status' => 'pending',
         'is_featured' => false,
+        'is_official' => false,
+        'is_disabled' => false,
         'views_count' => 0,
         'downloads_count' => 0,
         'purchases_count' => 0,
@@ -74,6 +79,8 @@ class MarketplaceResource extends Model
             'available_on_integrated_marketplace' => 'boolean',
             'status' => ResourceStatus::class,
             'is_featured' => 'boolean',
+            'is_official' => 'boolean',
+            'is_disabled' => 'boolean',
             'featured_until' => 'datetime',
             'views_count' => 'integer',
             'downloads_count' => 'integer',
@@ -103,6 +110,30 @@ class MarketplaceResource extends Model
     public function gatewayConfig(): BelongsTo
     {
         return $this->belongsTo(MarketplaceCreatorGatewayConfig::class, 'gateway_config_id');
+    }
+
+    public function gatewayConfigs(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            MarketplaceCreatorGatewayConfig::class,
+            'marketplace_resource_gateways',
+            'resource_id',
+            'gateway_config_id',
+        )->withTimestamps();
+    }
+
+    public function enabledGatewayConfigs(): BelongsToMany
+    {
+        return $this->gatewayConfigs()->enabled()->orderBy('name');
+    }
+
+    public function hasEnabledPaymentMethods(): bool
+    {
+        if ($this->relationLoaded('gatewayConfigs')) {
+            return $this->gatewayConfigs->contains(fn (MarketplaceCreatorGatewayConfig $config) => $config->is_enabled);
+        }
+
+        return $this->gatewayConfigs()->enabled()->exists();
     }
 
     public function approver(): BelongsTo
@@ -170,6 +201,11 @@ class MarketplaceResource extends Model
         return $query->where('status', ResourceStatus::Approved);
     }
 
+    public function scopeListed(Builder $query): Builder
+    {
+        return $query->approved()->where('is_disabled', false);
+    }
+
     public function scopeFeatured(Builder $query): Builder
     {
         return $query->where('is_featured', true)
@@ -179,12 +215,75 @@ class MarketplaceResource extends Model
             });
     }
 
+    public function scopeOfficial(Builder $query): Builder
+    {
+        return $query->where('is_official', true);
+    }
+
     public function scopePopular(Builder $query): Builder
     {
         return $query->orderByDesc('is_featured')
+            ->orderByDesc('is_official')
             ->orderByRaw('(views_count + downloads_count) desc')
             ->orderByDesc('purchases_count')
             ->orderByDesc('id');
+    }
+
+    public function scopeSortedBy(Builder $query, ?string $sort): Builder
+    {
+        return match ($sort) {
+            'popular_free' => $query->where('price', '<=', 0)->popular(),
+            'updated' => $query->orderByLastUpdated(),
+            'downloads' => $query->orderByDesc('downloads_count')->orderByDesc('id'),
+            'purchases' => $query->orderByDesc('purchases_count')->orderByDesc('id'),
+            default => $query->popular(),
+        };
+    }
+
+    public function scopeOrderByLastUpdated(Builder $query): Builder
+    {
+        return $query
+            ->orderByDesc(
+                MarketplaceResourceVersion::query()
+                    ->select('created_at')
+                    ->whereColumn('marketplace_resource_versions.resource_id', 'marketplace_resources.id')
+                    ->orderByDesc('created_at')
+                    ->limit(1)
+            )
+            ->orderByDesc('marketplace_resources.id');
+    }
+
+    public function scopeAuthoredBy(Builder $query, User $user): Builder
+    {
+        return $query->where('user_id', $user->id);
+    }
+
+    public function scopeCollaboratedBy(Builder $query, User $user): Builder
+    {
+        return $query
+            ->where('user_id', '!=', $user->id)
+            ->whereHas('teamMembers', fn (Builder $team) => $team->where('user_id', $user->id));
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    public static function browseSortOptions(): array
+    {
+        return [
+            ['value' => 'popular', 'label' => 'Popular (All)'],
+            ['value' => 'popular_free', 'label' => 'Popular (Free)'],
+            ['value' => 'updated', 'label' => 'Last Updated'],
+            ['value' => 'downloads', 'label' => 'Most Downloads'],
+            ['value' => 'purchases', 'label' => 'Most Purchases'],
+        ];
+    }
+
+    public static function authorProfileUrl(User|string $user): string
+    {
+        $username = $user instanceof User ? $user->username : $user;
+
+        return url('/marketplace/authors/'.$username);
     }
 
     public function scopeSearch(Builder $query, ?string $search): Builder
@@ -210,7 +309,10 @@ class MarketplaceResource extends Model
         }
 
         return $query->where(function (Builder $inner) use ($user) {
-            $inner->where('status', ResourceStatus::Approved);
+            $inner->where(function (Builder $listed) {
+                $listed->where('status', ResourceStatus::Approved)
+                    ->where('is_disabled', false);
+            });
 
             if ($user) {
                 $inner->orWhere('user_id', $user->id)
@@ -221,7 +323,7 @@ class MarketplaceResource extends Model
 
     public function scopeIntegrated(Builder $query): Builder
     {
-        return $query->approved()->where('available_on_integrated_marketplace', true);
+        return $query->listed()->where('available_on_integrated_marketplace', true);
     }
 
     public function isFree(): bool
@@ -229,9 +331,23 @@ class MarketplaceResource extends Model
         return (float) $this->price <= 0;
     }
 
+    public function isListedPublicly(): bool
+    {
+        return $this->status === ResourceStatus::Approved && ! $this->is_disabled;
+    }
+
+    public function canBeDeleted(): bool
+    {
+        if ($this->isFree()) {
+            return true;
+        }
+
+        return (int) $this->purchases_count === 0;
+    }
+
     public function canBeReviewedBy(?User $user): bool
     {
-        if (! $user || $this->status !== ResourceStatus::Approved) {
+        if (! $user || ! $this->isListedPublicly()) {
             return false;
         }
 
@@ -270,11 +386,23 @@ class MarketplaceResource extends Model
             return true;
         }
 
-        if ($this->status === ResourceStatus::Approved) {
+        if ($user && $this->teamRoleFor($user) !== null) {
             return true;
         }
 
-        return $user !== null && $this->teamRoleFor($user) !== null;
+        if ($this->isListedPublicly()) {
+            return true;
+        }
+
+        if ($user && $this->status === ResourceStatus::Approved && $this->is_disabled) {
+            return MarketplaceLicense::query()
+                ->where('resource_id', $this->id)
+                ->where('user_id', $user->id)
+                ->active()
+                ->exists();
+        }
+
+        return false;
     }
 
     public function teamRoleFor(?User $user): ?TeamRole

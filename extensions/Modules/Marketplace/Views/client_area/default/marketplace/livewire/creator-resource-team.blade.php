@@ -12,8 +12,6 @@ new class extends Component
 
     public string $member_username = '';
 
-    public string $member_role = 'developer';
-
     public function mount(): void
     {
         abort_unless($this->resource->userCan(auth()->user(), TeamRole::Support), 403);
@@ -41,12 +39,11 @@ new class extends Component
             'actor_user_id' => auth()->id(),
             'resource_id' => $this->resourceId,
             'user_id' => $user->id,
-            'role' => $this->member_role,
         ]);
 
         $this->member_username = '';
         unset($this->resource);
-        session()->flash('success', 'Team member added.');
+        session()->flash('success', 'Collaborator added with full access.');
     }
 
     public function removeMember(int $userId): void
@@ -88,15 +85,11 @@ new class extends Component
         </ul>
 
         @if($canTeam)
-            <form wire:submit="addMember" class="grid gap-3 sm:grid-cols-[1fr_10rem_auto]">
+            <form wire:submit="addMember" class="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <x-theme::form.input wire:model="member_username" placeholder="Username or email"/>
-                <select wire:model="member_role" class="rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                    <option value="manager">Manager</option>
-                    <option value="developer">Developer</option>
-                    <option value="support">Support</option>
-                </select>
-                <x-theme::button.primary type="submit">Add</x-theme::button.primary>
+                <x-theme::button.primary type="submit">Add collaborator</x-theme::button.primary>
             </form>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Collaborators get full access to this resource (listing, versions, purchases, and payment methods).</p>
             @error('member_username') <x-theme::form.error :text="$message"/> @enderror
             @error('user_id') <x-theme::form.error :text="$message"/> @enderror
         @endif

@@ -120,6 +120,10 @@ new class extends Component
             <div>
                 <x-theme::form.label for="icon" text="Icon (optional)"/>
                 <x-theme::form.file id="icon" wire:model="icon" accept="image/*"/>
+                <div wire:loading wire:target="icon" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Uploading…</div>
+                @if($icon)
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Selected: {{ $icon->getClientOriginalName() }}</p>
+                @endif
                 @error('icon') <x-theme::form.error :text="$message"/> @enderror
             </div>
             <div>

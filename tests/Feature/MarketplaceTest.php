@@ -288,11 +288,10 @@ class MarketplaceTest extends TestCase
             'actor_user_id' => $this->admin->id,
             'resource_id' => $resource->id,
             'user_id' => $this->buyer->id,
-            'role' => TeamRole::Developer->value,
         ]);
 
-        $this->assertSame(TeamRole::Developer, $member->role);
-        $this->assertTrue($resource->fresh()->userCan($this->buyer, TeamRole::Developer));
+        $this->assertSame(TeamRole::Manager, $member->role);
+        $this->assertTrue($resource->fresh()->userCan($this->buyer, TeamRole::Manager));
     }
 
     public function test_creator_gateway_credentials_are_encrypted(): void
@@ -359,6 +358,48 @@ class MarketplaceTest extends TestCase
         ]);
 
         $this->assertSame(SaleStatus::Pending, $sale->status);
+        $this->assertSame($config->id, $sale->gateway_config_id);
+
+        $stripe = MarketplaceCreatorGatewayConfig::actions()->create([
+            'user_id' => $this->creator->id,
+            'name' => 'Stripe',
+            'driver' => 'stripe',
+            'credentials' => [
+                'secret_key' => 'sk_test_secret_value',
+                'publishable_key' => 'pk_test_public_value',
+                'webhook_secret' => 'whsec_test_secret',
+            ],
+        ]);
+
+        MarketplaceResource::actions()->syncGateways([
+            'user_id' => $this->creator->id,
+            'resource_id' => $resource->id,
+            'gateway_config_ids' => [$config->id, $stripe->id],
+        ]);
+
+        $this->assertSame(
+            [$config->id, $stripe->id],
+            $resource->fresh()->gatewayConfigs()->orderBy('marketplace_creator_gateway_configs.id')->pluck('marketplace_creator_gateway_configs.id')->all()
+        );
+
+        try {
+            MarketplaceSale::actions()->startCheckout([
+                'user_id' => $this->buyer->id,
+                'resource_id' => $resource->id,
+            ]);
+            $this->fail('Checkout with multiple methods should require an explicit gateway.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('gateway_config_id', $exception->errors());
+        }
+
+        $sale = MarketplaceSale::actions()->startCheckout([
+            'user_id' => $this->buyer->id,
+            'resource_id' => $resource->id,
+            'gateway_config_id' => $stripe->id,
+        ]);
+
+        $this->assertSame($stripe->id, $sale->gateway_config_id);
+        $this->assertSame('stripe', $sale->driver);
 
         MarketplaceSale::actions()->complete($sale, [
             'gateway_reference' => 'TXN-1',
@@ -695,6 +736,198 @@ class MarketplaceTest extends TestCase
         $this->actingAs($this->creator)->get('/marketplace/library/resources')->assertOk()->assertSee('My Resources');
         auth()->logout();
         $this->get('/marketplace/library/purchases')->assertRedirect();
+    }
+
+    public function test_admin_can_mark_a_resource_official(): void
+    {
+        $resource = $this->createResource();
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        MarketplaceResource::actions()->setOfficialAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+            'is_official' => true,
+        ]);
+
+        $this->assertTrue($resource->fresh()->is_official);
+    }
+
+    public function test_author_can_disable_a_resource_while_buyers_keep_access(): void
+    {
+        $resource = $this->createResource(['name' => 'Paid disable', 'price' => 10]);
+        $this->createVersion($resource);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        MarketplaceLicense::actions()->grantAsManager([
+            'actor_user_id' => $this->creator->id,
+            'resource_id' => $resource->id,
+            'username' => $this->buyer->email,
+            'notify' => false,
+        ]);
+
+        MarketplaceResource::actions()->setDisabledAsCreator([
+            'user_id' => $this->creator->id,
+            'resource_id' => $resource->id,
+            'is_disabled' => true,
+        ]);
+
+        $resource->refresh();
+
+        $this->assertTrue($resource->is_disabled);
+        $this->assertFalse($resource->isListedPublicly());
+        $this->assertFalse($resource->isVisibleTo(null));
+        $this->assertFalse(
+            MarketplaceResource::query()->visibleTo($this->buyer)->whereKey($resource->id)->exists()
+        );
+        $this->assertTrue($resource->isVisibleTo($this->buyer));
+        $this->assertTrue($resource->isVisibleTo($this->creator));
+    }
+
+    public function test_paid_resources_with_purchases_cannot_be_deleted(): void
+    {
+        $resource = $this->createResource(['name' => 'Paid lock', 'price' => 15]);
+        $this->createVersion($resource);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        $config = MarketplaceCreatorGatewayConfig::actions()->create([
+            'user_id' => $this->creator->id,
+            'name' => 'PayPal',
+            'driver' => 'paypal_ipn',
+            'credentials' => [
+                'email' => 'seller@example.com',
+                'mode' => 'sandbox',
+            ],
+        ]);
+
+        MarketplaceResource::actions()->attachGateway([
+            'user_id' => $this->creator->id,
+            'resource_id' => $resource->id,
+            'gateway_config_id' => $config->id,
+        ]);
+
+        $sale = MarketplaceSale::actions()->startCheckout([
+            'user_id' => $this->buyer->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        MarketplaceSale::actions()->complete($sale, ['gateway_reference' => 'TXN-LOCK']);
+
+        $this->assertFalse($resource->fresh()->canBeDeleted());
+
+        try {
+            MarketplaceResource::actions()->deleteAsCreator([
+                'user_id' => $this->creator->id,
+                'resource_id' => $resource->id,
+            ]);
+            $this->fail('Paid resources with purchases should not be deletable.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('resource_id', $exception->errors());
+        }
+
+        try {
+            MarketplaceResource::actions()->deleteAsAdmin([
+                'admin_user_id' => $this->admin->id,
+                'resource_id' => $resource->id,
+            ]);
+            $this->fail('Admins should also be blocked from deleting paid resources with purchases.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('resource_id', $exception->errors());
+        }
+    }
+
+    public function test_authors_can_delete_free_or_unpurchased_paid_resources(): void
+    {
+        $free = $this->createResource(['name' => 'Free delete']);
+        $this->createVersion($free);
+
+        $this->assertTrue(
+            MarketplaceResource::actions()->deleteAsCreator([
+                'user_id' => $this->creator->id,
+                'resource_id' => $free->id,
+            ])
+        );
+        $this->assertDatabaseMissing('marketplace_resources', ['id' => $free->id]);
+
+        $paid = $this->createResource(['name' => 'Paid unused', 'price' => 9]);
+        $this->createVersion($paid);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $paid->id,
+        ]);
+
+        $this->assertTrue($paid->fresh()->canBeDeleted());
+        $this->assertTrue(
+            MarketplaceResource::actions()->deleteAsAdmin([
+                'admin_user_id' => $this->admin->id,
+                'resource_id' => $paid->id,
+            ])
+        );
+        $this->assertDatabaseMissing('marketplace_resources', ['id' => $paid->id]);
+    }
+
+    public function test_author_profile_lists_authored_and_collaborated_resources(): void
+    {
+        $owned = $this->createResource(['name' => 'Owned listing']);
+        $collab = $this->createResource(['name' => 'Collab listing', 'user_id' => $this->buyer->id]);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $owned->id,
+        ]);
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $collab->id,
+        ]);
+
+        MarketplaceResource::actions()->addTeamMember([
+            'actor_user_id' => $this->buyer->id,
+            'resource_id' => $collab->id,
+            'user_id' => $this->creator->id,
+        ]);
+
+        $this->get('/marketplace/authors/'.$this->creator->username)
+            ->assertOk()
+            ->assertSee('Owned listing')
+            ->assertSee('Authored');
+
+        $this->get('/marketplace/authors/nobody-here-'.uniqid())
+            ->assertNotFound();
+    }
+
+    public function test_browse_sort_supports_downloads_and_free_popular(): void
+    {
+        $free = $this->createResource(['name' => 'Free popular', 'price' => 0]);
+        $paid = $this->createResource(['name' => 'Paid popular', 'price' => 8]);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $free->id,
+        ]);
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $paid->id,
+        ]);
+
+        $free->update(['downloads_count' => 5, 'purchases_count' => 0]);
+        $paid->update(['downloads_count' => 20, 'purchases_count' => 4]);
+
+        $byDownloads = MarketplaceResource::query()->approved()->sortedBy('downloads')->pluck('name')->all();
+        $this->assertSame(['Paid popular', 'Free popular'], $byDownloads);
+
+        $freeOnly = MarketplaceResource::query()->approved()->sortedBy('popular_free')->pluck('name')->all();
+        $this->assertSame(['Free popular'], $freeOnly);
     }
 
     /**

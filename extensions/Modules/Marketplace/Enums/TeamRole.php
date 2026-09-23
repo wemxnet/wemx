@@ -13,7 +13,7 @@ enum TeamRole: string
     {
         return match ($this) {
             self::Owner => 'Owner',
-            self::Manager => 'Manager',
+            self::Manager => 'Collaborator',
             self::Developer => 'Developer',
             self::Support => 'Support',
         };

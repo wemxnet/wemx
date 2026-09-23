@@ -1,5 +1,6 @@
 <?php
 
+use Extensions\Modules\Marketplace\Enums\ResourceStatus;
 use Extensions\Modules\Marketplace\Enums\TeamRole;
 use Extensions\Modules\Marketplace\Models\MarketplaceCategory;
 use Extensions\Modules\Marketplace\Models\MarketplaceCreatorGatewayConfig;
@@ -35,9 +36,12 @@ new class extends Component
 
     public string $tags = '';
 
-    public ?int $gateway_config_id = null;
+    /** @var list<int|string> */
+    public array $gateway_config_ids = [];
 
     public bool $showPreview = false;
+
+    public bool $is_disabled = false;
 
     public function mount(): void
     {
@@ -60,14 +64,15 @@ new class extends Component
         $this->support_url = (string) $resource->support_url;
         $this->license_type = $resource->license_type;
         $this->tags = implode(', ', $resource->tags ?? []);
-        $this->gateway_config_id = $resource->gateway_config_id;
+        $this->gateway_config_ids = $resource->gatewayConfigs->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $this->is_disabled = (bool) $resource->is_disabled;
     }
 
     #[Computed]
     public function resource(): MarketplaceResource
     {
         return MarketplaceResource::query()
-            ->with(['category', 'gatewayConfig'])
+            ->with(['category', 'gatewayConfigs'])
             ->findOrFail($this->resourceId);
     }
 
@@ -98,7 +103,6 @@ new class extends Component
             'user_id' => auth()->id(),
             'resource_id' => $this->resourceId,
             'category_id' => $this->category_id,
-            'gateway_config_id' => $this->gateway_config_id ?: null,
             'name' => $this->name,
             'short_description' => $this->short_description,
             'description' => $this->description,
@@ -110,11 +114,39 @@ new class extends Component
             'license_type' => $this->license_type,
             'tags' => $this->tags,
             'available_on_integrated_marketplace' => $this->available_on_integrated_marketplace,
+            'gateway_config_ids' => collect($this->gateway_config_ids)->map(fn ($id) => (int) $id)->unique()->values()->all(),
         ]);
 
         unset($this->resource);
         $this->fillFromResource();
         session()->flash('success', 'Resource updated.');
+    }
+
+    public function toggleDisabled(): void
+    {
+        MarketplaceResource::actions()->setDisabledAsCreator([
+            'user_id' => auth()->id(),
+            'resource_id' => $this->resourceId,
+            'is_disabled' => $this->is_disabled,
+        ]);
+
+        unset($this->resource);
+        $this->fillFromResource();
+        session()->flash('success', $this->is_disabled
+            ? 'Resource disabled. It is hidden from the marketplace; buyers keep access.'
+            : 'Resource is listed on the marketplace again.');
+    }
+
+    public function deleteResource(): mixed
+    {
+        MarketplaceResource::actions()->deleteAsCreator([
+            'user_id' => auth()->id(),
+            'resource_id' => $this->resourceId,
+        ]);
+
+        session()->flash('success', 'Resource deleted.');
+
+        return $this->redirect(route('marketplace.studio.index'), navigate: true);
     }
 
     protected function formatPrice(mixed $price): string
@@ -130,11 +162,15 @@ new class extends Component
 @php
     $resource = $this->resource;
     $canEdit = $resource->userCan(auth()->user(), TeamRole::Manager);
+    $canDelete = $resource->userCan(auth()->user(), TeamRole::Owner);
 @endphp
 
 <div>
     @if(session('success'))
         <x-theme::alert.success :text="session('success')" />
+    @endif
+    @if(session('error'))
+        <x-theme::alert.danger :text="session('error')" />
     @endif
 
     <x-theme::card class="mb-4">
@@ -190,14 +226,30 @@ new class extends Component
                     <x-theme::form.input wire:model="support_url" placeholder="Support URL"/>
                 </div>
                 <div>
-                    <x-theme::form.label for="gateway_config_id" text="Payment method"/>
-                    <select id="gateway_config_id" wire:model="gateway_config_id" class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                        <option value="">None</option>
-                        @foreach($this->gateways as $gateway)
-                            <option value="{{ $gateway->id }}">{{ $gateway->name }} ({{ $gateway->driverName() }})</option>
-                        @endforeach
-                    </select>
-                    <x-theme::form.description text="Paid resources need a payment method from the creator studio."/>
+                    <x-theme::form.label text="Checkout payment methods"/>
+                    @if($this->gateways->isEmpty())
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Add a payment method in
+                            <a href="{{ route('marketplace.studio.gateways') }}" wire:navigate class="text-primary-700 hover:underline dark:text-primary-300">Creator Studio → Payment methods</a>
+                            first.
+                        </p>
+                    @else
+                        <div class="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                            @foreach($this->gateways as $gateway)
+                                <label class="flex items-center gap-3 text-sm text-gray-800 dark:text-gray-200">
+                                    <input
+                                        type="checkbox"
+                                        value="{{ $gateway->id }}"
+                                        wire:model="gateway_config_ids"
+                                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+                                    >
+                                    <span>{{ $gateway->name }} <span class="text-gray-500 dark:text-gray-400">({{ $gateway->driverName() }})</span></span>
+                                </label>
+                            @endforeach
+                        </div>
+                    @endif
+                    <x-theme::form.description text="Paid listings need at least one enabled method. Customers can choose any selected method at checkout."/>
+                    @error('gateway_config_ids') <x-theme::form.error :text="$message"/> @enderror
                 </div>
                 <x-theme::form.toggle wire:model="available_on_integrated_marketplace" text="Available on the integrated marketplace"/>
                 <div class="flex justify-end">
@@ -208,4 +260,31 @@ new class extends Component
             <p class="text-sm text-gray-500 dark:text-gray-400">You can view this listing, but only managers can edit it.</p>
         @endif
     </x-theme::card>
+
+    @if($canEdit && $resource->status === ResourceStatus::Approved)
+        <x-theme::card class="mb-4">
+            <h2 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Marketplace visibility</h2>
+            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Disable the listing to hide it from browse results. Buyers who already have access can still open and download it.</p>
+            <x-theme::form.toggle wire:model.live="is_disabled" wire:change="toggleDisabled" text="Disable listing (hide from marketplace)"/>
+            @error('is_disabled') <x-theme::form.error :text="$message"/> @enderror
+        </x-theme::card>
+    @endif
+
+    @if($canDelete)
+        <x-theme::card>
+            <h2 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Delete resource</h2>
+            @if($resource->canBeDeleted())
+                <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Permanently remove this resource and its versions. This cannot be undone.</p>
+                <button
+                    type="button"
+                    wire:click="deleteResource"
+                    wire:confirm="Delete this resource permanently?"
+                    class="rounded-lg border border-red-300 px-5 py-2.5 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40"
+                >Delete resource</button>
+            @else
+                <x-theme::alert.warning text="Paid resources with purchases cannot be deleted." />
+            @endif
+            @error('resource_id') <x-theme::form.error :text="$message"/> @enderror
+        </x-theme::card>
+    @endif
 </div>

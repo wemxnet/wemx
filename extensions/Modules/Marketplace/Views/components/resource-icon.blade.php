@@ -19,7 +19,7 @@
     @else
         <span
             class="font-semibold tracking-wide text-primary-700 dark:text-primary-300"
-            title="{{ $resource->name }} [{{ $resource->initials() }}]"
-        >[{{ $resource->initials() }}]</span>
+            title="{{ $resource->name }}"
+        >{{ $resource->initials() }}</span>
     @endif
 </div>

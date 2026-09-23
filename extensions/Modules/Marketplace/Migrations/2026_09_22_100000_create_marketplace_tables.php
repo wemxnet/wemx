@@ -59,6 +59,8 @@ return new class extends Migration
             $table->string('status')->default('pending');
             $table->text('rejection_reason')->nullable();
             $table->boolean('is_featured')->default(false);
+            $table->boolean('is_official')->default(false);
+            $table->boolean('is_disabled')->default(false);
             $table->timestamp('featured_until')->nullable();
             $table->unsignedInteger('views_count')->default(0);
             $table->unsignedInteger('downloads_count')->default(0);
@@ -69,9 +71,19 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['status', 'is_featured']);
+            $table->index(['status', 'is_disabled']);
             $table->index(['category_id', 'status']);
             $table->index(['available_on_integrated_marketplace', 'status']);
             $table->index(['views_count', 'downloads_count']);
+        });
+
+        Schema::create('marketplace_resource_gateways', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('resource_id')->constrained('marketplace_resources')->cascadeOnDelete();
+            $table->foreignId('gateway_config_id')->constrained('marketplace_creator_gateway_configs')->cascadeOnDelete();
+            $table->timestamps();
+
+            $table->unique(['resource_id', 'gateway_config_id']);
         });
 
         Schema::create('marketplace_resource_versions', function (Blueprint $table) {
@@ -193,6 +205,7 @@ return new class extends Migration
         Schema::dropIfExists('marketplace_sales');
         Schema::dropIfExists('marketplace_resource_team_members');
         Schema::dropIfExists('marketplace_resource_versions');
+        Schema::dropIfExists('marketplace_resource_gateways');
         Schema::dropIfExists('marketplace_resources');
         Schema::dropIfExists('marketplace_creator_gateway_configs');
         Schema::dropIfExists('marketplace_categories');

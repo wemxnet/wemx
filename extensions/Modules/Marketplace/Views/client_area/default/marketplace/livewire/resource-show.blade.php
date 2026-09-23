@@ -47,7 +47,7 @@ new class extends Component
     public function resource(): MarketplaceResource
     {
         return MarketplaceResource::query()
-            ->with(['category', 'author', 'versions', 'gatewayConfig', 'teamMembers.user'])
+            ->with(['category', 'author', 'versions', 'gatewayConfigs', 'teamMembers.user'])
             ->findOrFail($this->resourceId);
     }
 
@@ -102,12 +102,13 @@ new class extends Component
         session()->flash('success', 'Your review was removed.');
     }
 
-    public function buy(): void
+    public function buy(?int $gatewayConfigId = null): void
     {
         try {
             $sale = MarketplaceSale::actions()->startCheckout([
                 'user_id' => auth()->id(),
                 'resource_id' => $this->resourceId,
+                'gateway_config_id' => $gatewayConfigId,
             ]);
         } catch (ValidationException $exception) {
             session()->flash('error', collect($exception->errors())->flatten()->first() ?: 'Checkout could not be started.');
@@ -153,10 +154,11 @@ new class extends Component
         ? MarketplaceLicense::query()->where('resource_id', $resource->id)->where('user_id', $user->id)->active()->first()
         : null;
     $versions = $resource->versions;
-    $latest = $resource->status === ResourceStatus::Approved
+    $latest = $resource->isListedPublicly()
         ? ($resource->latestApprovedVersion() ?? $resource->latestVersion())
         : $resource->latestApprovedVersion();
-    $hasGateway = (bool) ($resource->gatewayConfig && $resource->gatewayConfig->is_enabled);
+    $paymentMethods = $resource->gatewayConfigs->where('is_enabled', true)->values();
+    $hasGateway = $paymentMethods->isNotEmpty();
     $canReview = $resource->canBeReviewedBy($user);
     $myReview = $this->myReview;
     $reviews = MarketplaceResourceReview::query()
@@ -189,6 +191,8 @@ new class extends Component
 
     @if($resource->status !== ResourceStatus::Approved)
         <x-theme::alert.warning :text="__('marketplace::messages.pending_approval')" />
+    @elseif($resource->is_disabled)
+        <x-theme::alert.warning text="This resource is disabled and hidden from the marketplace. Existing buyers can still access it." />
     @endif
 
     @if($resource->status === ResourceStatus::Rejected && $resource->rejection_reason)
@@ -205,6 +209,9 @@ new class extends Component
                         <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $resource->isFree() ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200' }}">{{ $resource->formattedPrice() }}</span>
                         @if($resource->isFeaturedNow())
                             <span class="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-200">Featured</span>
+                        @endif
+                        @if($resource->is_official)
+                            <span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-200">Official</span>
                         @endif
                         @if($latest)
                             <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">v{{ $latest->version }}</span>
@@ -314,7 +321,7 @@ new class extends Component
                                     </div>
                                 </form>
                             </x-theme::card>
-                        @elseif(! $resource->isFree() && $resource->status === ResourceStatus::Approved)
+                        @elseif(! $resource->isFree() && $resource->isListedPublicly())
                             <x-theme::alert.primary text="Purchase this resource to leave a review." />
                         @endif
                     @else
@@ -346,54 +353,30 @@ new class extends Component
         </div>
 
         <aside class="space-y-4">
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ $resource->formattedPrice() }}</div>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $resource->license_type }} license</p>
-                @if($resource->reviews_count > 0)
-                    <div class="mt-3">
-                        <x-marketplace::star-rating :rating="$resource->reviews_avg" :count="$resource->reviews_count" />
-                    </div>
-                @endif
-
-                @if($license)
-                    <x-theme::alert.success class="mt-4" text="You have an active license." />
-                    <p class="mt-2 break-all font-mono text-xs text-gray-600 dark:text-gray-300">{{ $license->license_key }}</p>
-                @endif
-
-                <div class="mt-4 space-y-2">
-                    @if($latest && ($resource->isFree() || $license || $canManage))
-                        <x-theme::button.primary href="{{ route('marketplace.versions.download', $latest) }}" class="block w-full text-center">
-                            Download {{ $latest->version }}
-                        </x-theme::button.primary>
-                    @elseif(! $resource->isFree() && $resource->status === ResourceStatus::Approved)
-                        @auth
-                            @if($hasGateway)
-                                <x-theme::button.primary type="button" wire:click="buy" class="w-full" wire:loading.attr="disabled">
-                                    <span wire:loading.remove wire:target="buy">Buy now</span>
-                                    <span wire:loading wire:target="buy">Starting checkout…</span>
-                                </x-theme::button.primary>
-                            @else
-                                <x-theme::alert.warning text="Purchases are unavailable until the creator configures a payment method." />
-                            @endif
-                        @else
-                            <x-theme::button.primary href="{{ route('login') }}" class="block w-full text-center">Sign in to purchase</x-theme::button.primary>
-                        @endauth
-                    @endif
-
-                    @if($canManage)
-                        <a href="{{ $resource->studioUrl() }}" wire:navigate class="block w-full rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Manage resource</a>
-                    @endif
-                </div>
-            </div>
-
             <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-                <div class="flex items-center gap-3">
-                    <img src="{{ $resource->author?->getAvatarUrl() }}" alt="" class="h-10 w-10 rounded-full">
-                    <div>
-                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $resource->author?->username }}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">Author</div>
+                @if($resource->author)
+                    <x-marketplace::author-link :user="$resource->author" role="Author" />
+                @endif
+
+                @php
+                    $collaborators = $resource->teamMembers
+                        ->filter(fn ($member) => $member->user && (int) $member->user_id !== (int) $resource->user_id)
+                        ->values();
+                @endphp
+
+                @if($collaborators->isNotEmpty())
+                    <div class="mt-4 border-t border-gray-100 pt-4 dark:border-gray-700">
+                        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Collaborators</h3>
+                        <ul class="space-y-3">
+                            @foreach($collaborators as $member)
+                                <li wire:key="collab-{{ $member->id }}">
+                                    <x-marketplace::author-link :user="$member->user" :role="$member->role->label()" size="sm" />
+                                </li>
+                            @endforeach
+                        </ul>
                     </div>
-                </div>
+                @endif
+
                 <dl class="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
                     <div><dt class="text-gray-500 dark:text-gray-400">Views</dt><dd class="font-semibold text-gray-900 dark:text-white">{{ number_format($resource->views_count) }}</dd></div>
                     <div><dt class="text-gray-500 dark:text-gray-400">Downloads</dt><dd class="font-semibold text-gray-900 dark:text-white">{{ number_format($resource->downloads_count) }}</dd></div>
@@ -420,6 +403,61 @@ new class extends Component
                         <li class="text-gray-500 dark:text-gray-400">No links provided.</li>
                     @endif
                 </ul>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ $resource->formattedPrice() }}</div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $resource->license_type }} license</p>
+                @if($resource->reviews_count > 0)
+                    <div class="mt-3">
+                        <x-marketplace::star-rating :rating="$resource->reviews_avg" :count="$resource->reviews_count" />
+                    </div>
+                @endif
+
+                @if($license)
+                    <x-theme::alert.success class="mt-4" text="You have an active license." />
+                    <p class="mt-2 break-all font-mono text-xs text-gray-600 dark:text-gray-300">{{ $license->license_key }}</p>
+                @endif
+
+                <div class="mt-4 space-y-2">
+                    @if($latest && ($resource->isFree() || $license || $canManage))
+                        <x-theme::button.primary href="{{ route('marketplace.versions.download', $latest) }}" class="block w-full text-center">
+                            Download {{ $latest->version }}
+                        </x-theme::button.primary>
+                    @elseif(! $resource->isFree() && $resource->isListedPublicly())
+                        @auth
+                            @if($hasGateway)
+                                <div class="space-y-2">
+                                    @foreach($paymentMethods as $method)
+                                        <x-theme::button.primary
+                                            type="button"
+                                            wire:click="buy({{ $method->id }})"
+                                            class="w-full"
+                                            wire:loading.attr="disabled"
+                                            wire:target="buy({{ $method->id }})"
+                                        >
+                                            <span wire:loading.remove wire:target="buy({{ $method->id }})">
+                                                {{ $paymentMethods->count() > 1 ? 'Pay with '.$method->name : 'Buy now' }}
+                                            </span>
+                                            <span wire:loading wire:target="buy({{ $method->id }})">Starting checkout…</span>
+                                        </x-theme::button.primary>
+                                    @endforeach
+                                    @if($paymentMethods->count() > 1)
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Choose any payment method offered by the author.</p>
+                                    @endif
+                                </div>
+                            @else
+                                <x-theme::alert.warning text="Purchases are unavailable until the creator configures a payment method." />
+                            @endif
+                        @else
+                            <x-theme::button.primary href="{{ route('login') }}" class="block w-full text-center">Sign in to purchase</x-theme::button.primary>
+                        @endauth
+                    @endif
+
+                    @if($canManage)
+                        <a href="{{ $resource->studioUrl() }}" wire:navigate class="block w-full rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Manage resource</a>
+                    @endif
+                </div>
             </div>
         </aside>
     </div>

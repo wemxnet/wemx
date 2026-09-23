@@ -1,12 +1,21 @@
 <?php
 
 use Extensions\Modules\Marketplace\Models\MarketplaceSale;
+use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 
 new class extends Component
 {
     use WithPagination;
+
+    #[Url]
+    public string $q = '';
+
+    public function updatingQ(): void
+    {
+        $this->resetPage();
+    }
 }
 
 ?>
@@ -15,14 +24,24 @@ new class extends Component
     $sales = MarketplaceSale::query()
         ->with(['resource', 'buyer'])
         ->where('seller_id', auth()->id())
+        ->search($this->q)
         ->latest()
         ->paginate(20);
 @endphp
 
 <div>
-    <h1 class="mb-4 text-2xl font-bold text-gray-900 dark:text-white">Sales</h1>
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Sales</h1>
+        <div class="sm:w-80">
+            <x-theme::form.input type="search" wire:model.live.debounce.300ms="q" placeholder="Search resource, buyer, reference…"/>
+        </div>
+    </div>
+
     @if($sales->isEmpty())
-        <x-theme::empty-state title="{{ __('marketplace::messages.no_sales') }}" description="Completed purchases of your resources will show up here." />
+        <x-theme::empty-state
+            title="{{ $this->q !== '' ? 'No matching sales' : __('marketplace::messages.no_sales') }}"
+            :description="$this->q !== '' ? 'Try a different search term.' : 'Completed purchases of your resources will show up here.'"
+        />
     @else
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
             <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">

@@ -5,7 +5,6 @@ namespace Extensions\Modules\Marketplace\Actions;
 use App\Actions\Action;
 use Extensions\Modules\Marketplace\Actions\Concerns\AuthorizesMarketplaceStaff;
 use Extensions\Modules\Marketplace\Enums\LicenseStatus;
-use Extensions\Modules\Marketplace\Enums\ResourceStatus;
 use Extensions\Modules\Marketplace\Models\MarketplaceLicense;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceReview;
@@ -30,7 +29,7 @@ class MarketplaceReviewActions extends Action
         $user = $this->user((int) $validated['user_id']);
         $resource = MarketplaceResource::findOrFail($validated['resource_id']);
 
-        if ($resource->status !== ResourceStatus::Approved) {
+        if (! $resource->isListedPublicly()) {
             throw ValidationException::withMessages([
                 'resource_id' => 'You can only review published resources.',
             ]);

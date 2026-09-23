@@ -3,6 +3,7 @@
 namespace Extensions\Modules\Marketplace\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Extensions\Modules\Marketplace\Models\MarketplaceCategory;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -12,6 +13,24 @@ class MarketplaceController extends Controller
     public function index()
     {
         return client_view('marketplace::marketplace.index');
+    }
+
+    public function author(string $username)
+    {
+        $author = User::query()->where('username', $username)->firstOrFail();
+
+        $involved = MarketplaceResource::query()
+            ->where(function ($query) use ($author) {
+                $query->authoredBy($author)
+                    ->orWhere(fn ($inner) => $inner->collaboratedBy($author));
+            })
+            ->exists();
+
+        abort_unless($involved, 404);
+
+        return client_view('marketplace::marketplace.author', [
+            'author' => $author,
+        ]);
     }
 
     public function show(MarketplaceCategory $category, MarketplaceResource $resource)

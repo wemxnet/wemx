@@ -16,6 +16,9 @@ new class extends Component
     #[Url]
     public ?string $category = null;
 
+    #[Url]
+    public string $sort = 'popular';
+
     public function updatingQ(): void
     {
         $this->resetPage();
@@ -26,9 +29,21 @@ new class extends Component
         $this->resetPage();
     }
 
+    public function updatingSort(): void
+    {
+        $this->resetPage();
+    }
+
     public function setCategory(?string $slug): void
     {
         $this->category = $slug;
+        $this->resetPage();
+    }
+
+    public function setSort(string $sort): void
+    {
+        $allowed = collect(MarketplaceResource::browseSortOptions())->pluck('value')->all();
+        $this->sort = in_array($sort, $allowed, true) ? $sort : 'popular';
         $this->resetPage();
     }
 }
@@ -38,21 +53,26 @@ new class extends Component
 @php
     $user = auth()->user();
     $categories = MarketplaceCategory::query()->visible()->ordered()->get();
+    $sortOptions = MarketplaceResource::browseSortOptions();
+    $sort = collect($sortOptions)->contains('value', $this->sort) ? $this->sort : 'popular';
+    $showFeatured = $sort === 'popular' && $this->q === '' && $this->category === null;
 
-    $featured = MarketplaceResource::query()
-        ->with(['category', 'author', 'versions'])
-        ->visibleTo($user)
-        ->featured()
-        ->popular()
-        ->limit(3)
-        ->get();
+    $featured = $showFeatured
+        ? MarketplaceResource::query()
+            ->with(['category', 'author', 'versions'])
+            ->visibleTo($user)
+            ->featured()
+            ->popular()
+            ->limit(3)
+            ->get()
+        : collect();
 
     $query = MarketplaceResource::query()
         ->with(['category', 'author', 'versions'])
         ->visibleTo($user)
-        ->popular();
+        ->sortedBy($sort);
 
-    if ($featured->isNotEmpty() && $this->q === '' && $this->category === null) {
+    if ($featured->isNotEmpty()) {
         $query->whereNotIn('id', $featured->modelKeys());
     }
 
@@ -71,7 +91,7 @@ new class extends Component
     <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{{ __('marketplace::messages.marketplace') }}</h1>
-            <p class="mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Browse WemX servers, modules, gateways, and themes. Featured listings stay at the top; everything else is ranked by views and downloads.</p>
+            <p class="mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Browse WemX servers, modules, gateways, and themes. Featured listings stay at the top; everything else follows your selected sort.</p>
         </div>
         <div class="flex flex-wrap gap-2">
             @auth
@@ -92,12 +112,20 @@ new class extends Component
                 </button>
             @endforeach
         </div>
-        <div class="lg:ml-auto lg:w-80">
-            <input type="search" wire:model.live.debounce.300ms="q" placeholder="Search resources…" class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+        <div class="flex flex-col gap-2 sm:flex-row lg:ml-auto">
+            <select
+                wire:model.live="sort"
+                class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:w-52"
+            >
+                @foreach($sortOptions as $option)
+                    <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                @endforeach
+            </select>
+            <input type="search" wire:model.live.debounce.300ms="q" placeholder="Search resources…" class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:w-72">
         </div>
     </div>
 
-    @if($featured->isNotEmpty() && $this->q === '' && $this->category === null)
+    @if($featured->isNotEmpty())
         <div class="mb-8">
             <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('marketplace::messages.featured') }}</h2>
             <div class="grid gap-4 md:grid-cols-3">
@@ -108,7 +136,7 @@ new class extends Component
         </div>
     @endif
 
-    @if($resources->isEmpty() && ($featured->isEmpty() || $this->q !== '' || $this->category !== null))
+    @if($resources->isEmpty() && ($featured->isEmpty() || $this->q !== '' || $this->category !== null || $sort !== 'popular'))
         <x-theme::empty-state
             title="{{ __('marketplace::messages.no_resources') }}"
             description="Resources appear here after an administrator approves them."

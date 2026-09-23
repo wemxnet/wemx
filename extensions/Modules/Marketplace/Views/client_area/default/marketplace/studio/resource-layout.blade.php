@@ -16,7 +16,15 @@
                 <a href="{{ route('marketplace.studio.index') }}" wire:navigate class="text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">Back to studio</a>
                 <h1 class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ $resource?->name ?? 'Publish a resource' }}</h1>
                 @if($resource)
-                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ $resource->status->label() }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ $resource->status->label() }}
+                        @if($resource->is_disabled)
+                            · Disabled (hidden from marketplace)
+                        @endif
+                        @if($resource->is_official)
+                            · Official
+                        @endif
+                    </p>
                 @else
                     <p class="text-sm text-gray-500 dark:text-gray-400">Listing details first, then the initial version.</p>
                 @endif

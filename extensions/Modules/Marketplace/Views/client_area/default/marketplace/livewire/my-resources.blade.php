@@ -59,7 +59,7 @@ new class extends Component
                             <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $resource->status->label() }}</td>
                             <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $resource->formattedPrice() }}</td>
                             <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
-                                {{ $resource->views_count }} views · {{ $resource->downloads_count }} dl
+                                {{ $resource->views_count }} views · {{ $resource->downloads_count }} downloads
                                 @if($resource->reviews_count)
                                     · {{ number_format((float) $resource->reviews_avg, 1) }}★
                                 @endif

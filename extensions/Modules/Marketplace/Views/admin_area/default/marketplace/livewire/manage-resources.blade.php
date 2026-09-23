@@ -38,6 +38,8 @@ new class extends Component
         'rejected' => $query->where('status', 'rejected'),
         'suspended' => $query->where('status', 'suspended'),
         'featured' => $query->featured(),
+        'official' => $query->official(),
+        'disabled' => $query->where('is_disabled', true),
         default => $query,
     };
 
@@ -62,6 +64,8 @@ new class extends Component
                         <option value="rejected">Rejected</option>
                         <option value="suspended">Suspended</option>
                         <option value="featured">Featured</option>
+                        <option value="official">Official</option>
+                        <option value="disabled">Disabled</option>
                     </select>
                     <input type="search" class="form-control form-control-sm" style="min-width: 14rem;" wire:model.live.debounce.300ms="search" placeholder="Search resources">
                 </div>
@@ -91,8 +95,14 @@ new class extends Component
                                 @if($resource->isFeaturedNow())
                                     <span class="badge bg-blue-lt">Featured</span>
                                 @endif
+                                @if($resource->is_official)
+                                    <span class="badge bg-cyan-lt">Official</span>
+                                @endif
+                                @if($resource->is_disabled)
+                                    <span class="badge bg-orange-lt">Disabled</span>
+                                @endif
                             </td>
-                            <td>{{ $resource->views_count }} views · {{ $resource->downloads_count }} dl</td>
+                            <td>{{ $resource->views_count }} views · {{ $resource->downloads_count }} downloads</td>
                             <td class="text-end">
                                 <a href="{{ route('admin.marketplace.resources.show', $resource) }}" wire:navigate>Review</a>
                             </td>

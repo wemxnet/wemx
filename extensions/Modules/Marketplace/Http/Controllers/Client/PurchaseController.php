@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 class PurchaseController extends Controller
 {
-    public function start(MarketplaceResource $resource)
+    public function start(Request $request, MarketplaceResource $resource)
     {
         abort_unless($resource->isVisibleTo(auth()->user()), 404);
 
@@ -19,6 +19,7 @@ class PurchaseController extends Controller
             $sale = MarketplaceSale::actions()->startCheckout([
                 'user_id' => auth()->id(),
                 'resource_id' => $resource->id,
+                'gateway_config_id' => $request->input('gateway_config_id'),
             ]);
         } catch (ValidationException $exception) {
             return redirect($resource->clientUrl())

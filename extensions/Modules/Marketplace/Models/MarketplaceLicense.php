@@ -86,6 +86,31 @@ class MarketplaceLicense extends Model
             });
     }
 
+    public function scopeSearch(Builder $query, ?string $search): Builder
+    {
+        if (! $search) {
+            return $query;
+        }
+
+        $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
+
+        return $query->where(function (Builder $inner) use ($term) {
+            $inner->where('license_key', 'like', $term)
+                ->orWhere('payment_method', 'like', $term)
+                ->orWhere('transaction_id', 'like', $term)
+                ->orWhere('source', 'like', $term)
+                ->orWhereHas('user', function (Builder $user) use ($term) {
+                    $user->where('username', 'like', $term)
+                        ->orWhere('email', 'like', $term);
+                })
+                ->orWhereHas('resource', fn (Builder $resource) => $resource->where('name', 'like', $term))
+                ->orWhereHas('sale', function (Builder $sale) use ($term) {
+                    $sale->where('gateway_reference', 'like', $term)
+                        ->orWhere('driver', 'like', $term);
+                });
+        });
+    }
+
     public function isUsable(): bool
     {
         if ($this->status !== LicenseStatus::Active) {

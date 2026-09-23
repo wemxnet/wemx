@@ -22,6 +22,8 @@ new class extends Component
 
     public string $changelog = '';
 
+    public bool $showPreview = false;
+
     public bool $version_integrated = true;
 
     public bool $notify_customers = false;
@@ -49,6 +51,11 @@ new class extends Component
         return MarketplaceResource::query()
             ->with(['category', 'versions'])
             ->findOrFail($this->resourceId);
+    }
+
+    public function togglePreview(): void
+    {
+        $this->showPreview = ! $this->showPreview;
     }
 
     public function addVersion(): mixed
@@ -170,12 +177,23 @@ new class extends Component
                 </div>
                 <div>
                     <x-theme::form.label for="changelog" text="Changelog"/>
-                    <x-theme::form.textarea id="changelog" wire:model="changelog" rows="4" placeholder="Changelog"/>
+                    <x-marketplace::markdown-composer
+                        id="version-changelog"
+                        wire:model="changelog"
+                        placeholder="What’s new in this release. Markdown is supported."
+                        :showPreview="$showPreview"
+                        :previewHtml="\Illuminate\Support\Str::markdown($changelog, ['html_input' => 'strip', 'allow_unsafe_links' => false])"
+                        :rows="6"
+                    />
+                    @error('changelog') <x-theme::form.error :text="$message"/> @enderror
                 </div>
                 <div>
                     <x-theme::form.label for="package" text="Zip file"/>
                     <x-theme::form.file id="package" wire:model="package" accept=".zip,application/zip"/>
                     <div wire:loading wire:target="package" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Uploading…</div>
+                    @if($package)
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Selected: {{ $package->getClientOriginalName() }}</p>
+                    @endif
                 </div>
                 @error('file') <x-theme::form.error :text="$message"/> @enderror
                 <x-theme::form.toggle wire:model.live="version_integrated" text="Downloadable from the integrated marketplace"/>

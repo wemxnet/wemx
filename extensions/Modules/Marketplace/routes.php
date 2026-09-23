@@ -21,6 +21,7 @@ Route::post('/marketplace/webhooks/{driver}/{config}', [Client\GatewayWebhookCon
 Route::middleware('web')->group(function () {
     Route::get('/marketplace', [Client\MarketplaceController::class, 'index'])->name('marketplace.index');
     Route::get('/marketplace/icons/{resource}', [Client\MarketplaceController::class, 'icon'])->name('marketplace.icons');
+    Route::get('/marketplace/authors/{username}', [Client\MarketplaceController::class, 'author'])->name('marketplace.authors.show');
 
     Route::middleware('auth')->group(function () {
         Route::get('/marketplace/library/purchases', [Client\LibraryController::class, 'purchases'])->name('marketplace.library.purchases');

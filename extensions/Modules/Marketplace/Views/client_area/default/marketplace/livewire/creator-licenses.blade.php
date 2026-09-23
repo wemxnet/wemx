@@ -2,12 +2,21 @@
 
 use Extensions\Modules\Marketplace\Enums\LicenseStatus;
 use Extensions\Modules\Marketplace\Models\MarketplaceLicense;
+use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 
 new class extends Component
 {
     use WithPagination;
+
+    #[Url]
+    public string $q = '';
+
+    public function updatingQ(): void
+    {
+        $this->resetPage();
+    }
 
     public function revoke(int $licenseId): void
     {
@@ -27,15 +36,25 @@ new class extends Component
             $query->where('user_id', auth()->id())
                 ->orWhereHas('teamMembers', fn ($team) => $team->where('user_id', auth()->id()));
         })
+        ->search($this->q)
         ->orderByDesc('purchased_at')
         ->orderByDesc('created_at')
         ->paginate(20);
 @endphp
 
 <div>
-    <h1 class="mb-4 text-2xl font-bold text-gray-900 dark:text-white">Purchases</h1>
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Purchases</h1>
+        <div class="sm:w-80">
+            <x-theme::form.input type="search" wire:model.live.debounce.300ms="q" placeholder="Search customer, resource, key…"/>
+        </div>
+    </div>
+
     @if($licenses->isEmpty())
-        <x-theme::empty-state title="{{ __('marketplace::messages.no_licenses') }}" description="Purchases appear when someone buys a resource, downloads a free resource, or you grant access." />
+        <x-theme::empty-state
+            title="{{ $this->q !== '' ? 'No matching purchases' : __('marketplace::messages.no_licenses') }}"
+            :description="$this->q !== '' ? 'Try a different search term.' : 'Purchases appear when someone buys a resource, downloads a free resource, or you grant access.'"
+        />
     @else
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
             <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">

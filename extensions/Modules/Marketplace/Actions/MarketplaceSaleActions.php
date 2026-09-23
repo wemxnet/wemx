@@ -7,6 +7,7 @@ use Extensions\Modules\Marketplace\Actions\Concerns\AuthorizesMarketplaceStaff;
 use Extensions\Modules\Marketplace\Enums\LicenseStatus;
 use Extensions\Modules\Marketplace\Enums\ResourceStatus;
 use Extensions\Modules\Marketplace\Enums\SaleStatus;
+use Extensions\Modules\Marketplace\Models\MarketplaceCreatorGatewayConfig;
 use Extensions\Modules\Marketplace\Models\MarketplaceLicense;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceSale;
@@ -24,14 +25,23 @@ class MarketplaceSaleActions extends Action
         $validated = Validator::make($input, [
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+            'gateway_config_id' => ['nullable', 'integer', 'exists:marketplace_creator_gateway_configs,id'],
         ])->validate();
 
         $buyer = $this->user((int) $validated['user_id']);
-        $resource = MarketplaceResource::query()->with('gatewayConfig')->findOrFail($validated['resource_id']);
+        $resource = MarketplaceResource::query()
+            ->with(['gatewayConfigs' => fn ($query) => $query->enabled()->orderBy('name')])
+            ->findOrFail($validated['resource_id']);
 
         if ($resource->status !== ResourceStatus::Approved) {
             throw ValidationException::withMessages([
                 'resource_id' => 'This resource is not available for purchase.',
+            ]);
+        }
+
+        if ($resource->is_disabled) {
+            throw ValidationException::withMessages([
+                'resource_id' => 'This resource is no longer available for purchase.',
             ]);
         }
 
@@ -59,11 +69,7 @@ class MarketplaceSaleActions extends Action
             ]);
         }
 
-        if (! $resource->gatewayConfig || ! $resource->gatewayConfig->is_enabled) {
-            throw ValidationException::withMessages([
-                'resource_id' => 'The creator has not configured a payment method yet.',
-            ]);
-        }
+        $gateway = $this->resolveCheckoutGateway($resource, $validated['gateway_config_id'] ?? null);
 
         $pending = MarketplaceSale::query()
             ->where('resource_id', $resource->id)
@@ -73,7 +79,15 @@ class MarketplaceSaleActions extends Action
             ->first();
 
         if ($pending) {
-            return $pending;
+            $pending->update([
+                'gateway_config_id' => $gateway->id,
+                'driver' => $gateway->driver,
+                'amount' => $resource->price,
+                'currency' => $resource->currency,
+                'version_id' => $resource->latestApprovedVersion()?->id ?? $pending->version_id,
+            ]);
+
+            return $pending->fresh();
         }
 
         return MarketplaceSale::create([
@@ -81,8 +95,8 @@ class MarketplaceSaleActions extends Action
             'version_id' => $resource->latestApprovedVersion()?->id,
             'seller_id' => $resource->user_id,
             'buyer_id' => $buyer->id,
-            'gateway_config_id' => $resource->gateway_config_id,
-            'driver' => $resource->gatewayConfig->driver,
+            'gateway_config_id' => $gateway->id,
+            'driver' => $gateway->driver,
             'amount' => $resource->price,
             'currency' => $resource->currency,
             'status' => SaleStatus::Pending,
@@ -125,5 +139,38 @@ class MarketplaceSaleActions extends Action
         $sale->update(['status' => SaleStatus::Failed]);
 
         return $sale->fresh();
+    }
+
+    protected function resolveCheckoutGateway(MarketplaceResource $resource, mixed $gatewayConfigId): MarketplaceCreatorGatewayConfig
+    {
+        $enabledGateways = $resource->relationLoaded('gatewayConfigs')
+            ? $resource->gatewayConfigs->where('is_enabled', true)->values()
+            : $resource->gatewayConfigs()->enabled()->orderBy('name')->get();
+
+        if ($enabledGateways->isEmpty()) {
+            throw ValidationException::withMessages([
+                'resource_id' => 'The creator has not configured a payment method yet.',
+            ]);
+        }
+
+        if ($gatewayConfigId === null || $gatewayConfigId === '') {
+            if ($enabledGateways->count() === 1) {
+                return $enabledGateways->first();
+            }
+
+            throw ValidationException::withMessages([
+                'gateway_config_id' => 'Select a payment method to continue checkout.',
+            ]);
+        }
+
+        $gateway = $enabledGateways->firstWhere('id', (int) $gatewayConfigId);
+
+        if (! $gateway) {
+            throw ValidationException::withMessages([
+                'gateway_config_id' => 'That payment method is not available for this resource.',
+            ]);
+        }
+
+        return $gateway;
     }
 }

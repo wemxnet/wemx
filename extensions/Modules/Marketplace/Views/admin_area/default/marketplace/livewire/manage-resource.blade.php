@@ -14,13 +14,14 @@ new class extends Component
 
     public bool $is_featured = false;
 
-    public string $member_username = '';
+    public bool $is_official = false;
 
-    public string $member_role = 'developer';
+    public string $member_username = '';
 
     public function mount(): void
     {
         $this->is_featured = $this->resource->is_featured;
+        $this->is_official = $this->resource->is_official;
         $this->rejection_reason = (string) $this->resource->rejection_reason;
     }
 
@@ -28,7 +29,7 @@ new class extends Component
     public function resource(): MarketplaceResource
     {
         return MarketplaceResource::query()
-            ->with(['category', 'author', 'versions', 'teamMembers.user', 'gatewayConfig'])
+            ->with(['category', 'author', 'versions', 'teamMembers.user', 'gatewayConfigs'])
             ->findOrFail($this->resourceId);
     }
 
@@ -75,6 +76,29 @@ new class extends Component
         unset($this->resource);
     }
 
+    public function toggleOfficial(): void
+    {
+        MarketplaceResource::actions()->setOfficialAsAdmin([
+            'admin_user_id' => auth()->id(),
+            'resource_id' => $this->resourceId,
+            'is_official' => $this->is_official,
+        ]);
+
+        unset($this->resource);
+    }
+
+    public function deleteResource(): mixed
+    {
+        MarketplaceResource::actions()->deleteAsAdmin([
+            'admin_user_id' => auth()->id(),
+            'resource_id' => $this->resourceId,
+        ]);
+
+        session()->flash('success', 'Resource deleted.');
+
+        return $this->redirect(route('admin.marketplace.resources.index'), navigate: true);
+    }
+
     public function addMember(): void
     {
         $user = User::query()->where('username', $this->member_username)->orWhere('email', $this->member_username)->first();
@@ -89,7 +113,6 @@ new class extends Component
             'actor_user_id' => auth()->id(),
             'resource_id' => $this->resourceId,
             'user_id' => $user->id,
-            'role' => $this->member_role,
         ]);
 
         $this->member_username = '';
@@ -169,21 +192,15 @@ new class extends Component
                         @endforeach
                     </ul>
                     <form wire:submit="addMember" class="row g-2">
-                        <div class="col-md-6">
+                        <div class="col-md-9">
                             <input class="form-control" wire:model="member_username" placeholder="Username or email">
                             @error('member_username') <x-admin::form.error :message="$message"/> @enderror
                         </div>
                         <div class="col-md-3">
-                            <select class="form-select" wire:model="member_role">
-                                <option value="manager">Manager</option>
-                                <option value="developer">Developer</option>
-                                <option value="support">Support</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <button class="btn btn-primary w-100" type="submit">Add user</button>
+                            <button class="btn btn-primary w-100" type="submit">Add collaborator</button>
                         </div>
                     </form>
+                    <p class="text-secondary small mt-2 mb-0">Collaborators get full access to this resource.</p>
                 </div>
             </div>
         </div>
@@ -206,6 +223,22 @@ new class extends Component
                         <input class="form-check-input" type="checkbox" wire:model.live="is_featured" wire:change="toggleFeatured" id="featured">
                         <label class="form-check-label" for="featured">Featured on the marketplace</label>
                     </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" wire:model.live="is_official" wire:change="toggleOfficial" id="official">
+                        <label class="form-check-label" for="official">Official resource</label>
+                    </div>
+                    <hr class="my-3">
+                    @if($resource->canBeDeleted())
+                        <button
+                            type="button"
+                            class="btn btn-outline-danger w-100"
+                            wire:click="deleteResource"
+                            wire:confirm="Delete this resource permanently?"
+                        >Delete resource</button>
+                    @else
+                        <div class="alert alert-warning mb-0">Paid resources with purchases cannot be deleted.</div>
+                    @endif
+                    @error('resource_id') <x-admin::form.error :message="$message"/> @enderror
                 </div>
             </div>
             <div class="card">
@@ -224,8 +257,18 @@ new class extends Component
                             <div class="datagrid-content">{{ $resource->formattedPrice() }}</div>
                         </div>
                         <div class="datagrid-item">
-                            <div class="datagrid-title">Gateway</div>
-                            <div class="datagrid-content">{{ $resource->gatewayConfig?->name ?? '—' }}</div>
+                            <div class="datagrid-title">Listing</div>
+                            <div class="datagrid-content">{{ $resource->is_disabled ? 'Disabled' : 'Listed' }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">Payment methods</div>
+                            <div class="datagrid-content">
+                                @forelse($resource->gatewayConfigs as $gateway)
+                                    <div>{{ $gateway->name }} ({{ $gateway->driverName() }})</div>
+                                @empty
+                                    —
+                                @endforelse
+                            </div>
                         </div>
                     </div>
                 </div>

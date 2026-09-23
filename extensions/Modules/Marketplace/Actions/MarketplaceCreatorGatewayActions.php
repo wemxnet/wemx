@@ -88,7 +88,7 @@ class MarketplaceCreatorGatewayActions extends Action
             ]);
         }
 
-        if ($config->resources()->exists()) {
+        if ($config->resources()->exists() || $config->legacyResources()->exists()) {
             throw ValidationException::withMessages([
                 'gateway_config_id' => 'Detach this payment method from resources before deleting it.',
             ]);

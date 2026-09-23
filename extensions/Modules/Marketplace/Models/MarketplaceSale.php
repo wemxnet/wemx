@@ -93,6 +93,26 @@ class MarketplaceSale extends Model
         return $query->where('status', SaleStatus::Completed);
     }
 
+    public function scopeSearch(Builder $query, ?string $search): Builder
+    {
+        if (! $search) {
+            return $query;
+        }
+
+        $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
+
+        return $query->where(function (Builder $inner) use ($term) {
+            $inner->where('driver', 'like', $term)
+                ->orWhere('gateway_reference', 'like', $term)
+                ->orWhere('currency', 'like', $term)
+                ->orWhereHas('resource', fn (Builder $resource) => $resource->where('name', 'like', $term))
+                ->orWhereHas('buyer', function (Builder $buyer) use ($term) {
+                    $buyer->where('username', 'like', $term)
+                        ->orWhere('email', 'like', $term);
+                });
+        });
+    }
+
     public function isCompleted(): bool
     {
         return $this->status === SaleStatus::Completed;
