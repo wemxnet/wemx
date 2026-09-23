@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'marketplace' => 'Marketplace',
+    'studio' => 'Creator studio',
+    'resources' => 'Resources',
+    'resource' => 'Resource',
+    'versions' => 'Versions',
+    'sales' => 'Sales',
+    'licenses' => 'Purchases',
+    'my_purchases' => 'My Purchases',
+    'my_resources' => 'My Resources',
+    'gateways' => 'Payment methods',
+    'featured' => 'Featured',
+    'popular' => 'Popular',
+    'free' => 'Free',
+    'pending_approval' => 'This resource is pending approval by an administrator. It will appear in the marketplace after it is reviewed.',
+    'no_resources' => 'No resources found.',
+    'no_sales' => 'No sales yet.',
+    'no_licenses' => 'No purchases yet.',
+    'reviews' => 'Reviews',
+    'views' => 'views',
+    'downloads' => 'downloads',
+    'purchases' => 'purchases',
+];

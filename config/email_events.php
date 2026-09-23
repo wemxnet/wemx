@@ -747,4 +747,273 @@ BODY,
         ],
     ],
 
+    'marketplace.resource.pending' => [
+        'name' => 'Marketplace resource pending review',
+        'group' => 'Marketplace',
+        'description' => 'Sent to resource owners and managers when a listing is waiting for admin approval.',
+        'subject' => 'Your marketplace resource is pending review: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{resource_name}}** ({{category}}) was submitted and is **{{status}}**.
+
+We will email you once an administrator reviews your listing.
+BODY,
+        'button_text' => 'Open creator studio',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'category' => 'Category name',
+            'status' => 'Current status label',
+        ],
+    ],
+
+    'marketplace.resource.approved' => [
+        'name' => 'Marketplace resource approved',
+        'group' => 'Marketplace',
+        'description' => 'Sent to resource owners and managers when a listing is approved and published.',
+        'subject' => 'Your resource was approved: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+Great news — **{{resource_name}}** in {{category}} has been approved and is now live on the marketplace.
+BODY,
+        'button_text' => 'View listing',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'category' => 'Category name',
+        ],
+    ],
+
+    'marketplace.resource.rejected' => [
+        'name' => 'Marketplace resource rejected',
+        'group' => 'Marketplace',
+        'description' => 'Sent to resource owners and managers when a listing is rejected, including the reason.',
+        'subject' => 'Your resource was rejected: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{resource_name}}** ({{category}}) was rejected and will not appear on the marketplace until you update it and resubmit.
+
+Reason:
+{{rejection_reason}}
+BODY,
+        'button_text' => 'Update resource',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'category' => 'Category name',
+            'rejection_reason' => 'Admin rejection reason',
+        ],
+    ],
+
+    'marketplace.resource.suspended' => [
+        'name' => 'Marketplace resource suspended',
+        'group' => 'Marketplace',
+        'description' => 'Sent to resource owners and managers when a published listing is suspended.',
+        'subject' => 'Your resource was suspended: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{resource_name}}** ({{category}}) has been suspended and is no longer available on the marketplace.
+
+Reason:
+{{rejection_reason}}
+BODY,
+        'button_text' => 'Open creator studio',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'category' => 'Category name',
+            'rejection_reason' => 'Suspension reason',
+        ],
+    ],
+
+    'marketplace.resource.featured' => [
+        'name' => 'Marketplace resource featured',
+        'group' => 'Marketplace',
+        'description' => 'Sent to resource owners and managers when a listing is featured.',
+        'subject' => 'Your resource is now featured: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{resource_name}}** ({{category}}) was marked as featured on the marketplace.
+BODY,
+        'button_text' => 'View listing',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'category' => 'Category name',
+        ],
+    ],
+
+    'marketplace.version.submitted' => [
+        'name' => 'Marketplace version submitted',
+        'group' => 'Marketplace',
+        'description' => 'Sent to resource owners and managers when a new version is uploaded for review.',
+        'subject' => 'Version submitted for review: {{resource_name}} {{version_number}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{version_name}}** (v{{version_number}}) for **{{resource_name}}** was uploaded and is waiting for administrator approval.
+BODY,
+        'button_text' => 'View versions',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'version_name' => 'Version display name',
+            'version_number' => 'Version number',
+        ],
+    ],
+
+    'marketplace.version.approved' => [
+        'name' => 'Marketplace version approved',
+        'group' => 'Marketplace',
+        'description' => 'Sent to resource owners and managers when a version is approved.',
+        'subject' => 'Version approved: {{resource_name}} {{version_number}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{version_name}}** (v{{version_number}}) for **{{resource_name}}** has been approved and is available to download.
+BODY,
+        'button_text' => 'View listing',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'version_name' => 'Version display name',
+            'version_number' => 'Version number',
+        ],
+    ],
+
+    'marketplace.version.rejected' => [
+        'name' => 'Marketplace version rejected',
+        'group' => 'Marketplace',
+        'description' => 'Sent to resource owners and managers when a version is rejected.',
+        'subject' => 'Version rejected: {{resource_name}} {{version_number}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{version_name}}** (v{{version_number}}) for **{{resource_name}}** was rejected. Upload a corrected package from your creator studio.
+BODY,
+        'button_text' => 'Upload a new version',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'version_name' => 'Version display name',
+            'version_number' => 'Version number',
+        ],
+    ],
+
+    'marketplace.version.released' => [
+        'name' => 'Marketplace version released',
+        'group' => 'Marketplace',
+        'description' => 'Sent to customers with an active purchase when a creator publishes a new version and opts in to notify them.',
+        'subject' => 'New version of {{resource_name}}: {{version_number}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{resource_name}}** has a new release: **{{version_name}}** (v{{version_number}}).
+
+{{changelog}}
+BODY,
+        'button_text' => 'Download update',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'version_name' => 'Version display name',
+            'version_number' => 'Version number',
+            'changelog' => 'Changelog preview',
+        ],
+    ],
+
+    'marketplace.purchase.buyer' => [
+        'name' => 'Marketplace purchase confirmation',
+        'group' => 'Marketplace',
+        'description' => 'Sent to the buyer after a successful marketplace purchase.',
+        'subject' => 'Purchase confirmed: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+Your purchase of **{{resource_name}}** for **{{amount}}** is complete.
+
+Seller: {{seller_name}}
+License key: {{license_key}}
+
+You can download the resource from your marketplace library.
+BODY,
+        'button_text' => 'Download resource',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'amount' => 'Formatted purchase amount',
+            'seller_name' => 'Seller display name',
+            'license_key' => 'Issued license key',
+        ],
+    ],
+
+    'marketplace.purchase.seller' => [
+        'name' => 'Marketplace sale notification',
+        'group' => 'Marketplace',
+        'description' => 'Sent to the creator when someone purchases their resource.',
+        'subject' => 'New sale: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+**{{buyer_name}}** purchased **{{resource_name}}** for **{{amount}}**.
+
+A license was issued automatically.
+BODY,
+        'button_text' => 'View licenses',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'amount' => 'Formatted sale amount',
+            'buyer_name' => 'Buyer display name',
+        ],
+    ],
+
+    'marketplace.license.granted' => [
+        'name' => 'Marketplace license granted',
+        'group' => 'Marketplace',
+        'description' => 'Sent when a free or complimentary license is granted to a user.',
+        'subject' => 'License granted: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+You now have a license for **{{resource_name}}**.
+
+License key: {{license_key}}
+BODY,
+        'button_text' => 'Open resource',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'license_key' => 'Issued license key',
+        ],
+    ],
+
+    'marketplace.license.revoked' => [
+        'name' => 'Marketplace license revoked',
+        'group' => 'Marketplace',
+        'description' => 'Sent when a license is revoked.',
+        'subject' => 'License revoked: {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+Your license for **{{resource_name}}** ({{license_key}}) has been revoked and downloads are no longer available.
+BODY,
+        'button_text' => 'View resource',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'license_key' => 'Revoked license key',
+        ],
+    ],
+
+    'marketplace.team.invited' => [
+        'name' => 'Marketplace team invitation',
+        'group' => 'Marketplace',
+        'description' => 'Sent when a user is added to a resource team.',
+        'subject' => 'You were added to {{resource_name}}',
+        'body' => <<<'BODY'
+Hi {{user_name}},
+
+{{inviter_name}} added you to the **{{resource_name}}** team as **{{role}}**.
+BODY,
+        'button_text' => 'Open creator studio',
+        'placeholders' => [
+            'resource_name' => 'Resource name',
+            'role' => 'Team role label',
+            'inviter_name' => 'Name of the person who invited them',
+        ],
+    ],
+
 ];

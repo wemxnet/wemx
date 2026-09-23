@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'gateways/webhooks/*',
             'gateways/callbacks/*',
             'tickets/inbound-mail',
+            'marketplace/webhooks/*',
         ]);
 
         $middleware->alias([
