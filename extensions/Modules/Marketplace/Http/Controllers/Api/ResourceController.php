@@ -20,7 +20,10 @@ class ResourceController extends Controller
 
         $query = match ($sort) {
             'latest' => $query->latest('published_at')->latest('id'),
+            'updated' => $query->orderByLastUpdated(),
             'downloads' => $query->orderByDesc('downloads_count')->orderByDesc('id'),
+            'purchases' => $query->orderByDesc('purchases_count')->orderByDesc('id'),
+            'popular_free' => $query->where('price', '<=', 0)->popular(),
             'featured' => $query->featured()->popular(),
             default => $query->popular(),
         };
@@ -41,20 +44,58 @@ class ResourceController extends Controller
             $query->search($request->string('search')->toString());
         }
 
-        $resources = $query->paginate($request->integer('per_page', 24))
-            ->through(fn (MarketplaceResource $resource) => $resource->toIntegratedArray());
+        $perPage = min(18, max(1, $request->integer('per_page', 18)));
 
-        return response()->json($resources);
+        $resources = $query->paginate($perPage)
+            ->through(fn (MarketplaceResource $resource) => $resource->toIntegratedArray(summary: true));
+
+        $showFeatured = $sort === 'popular'
+            && ! $request->filled('search')
+            && ! $request->filled('category')
+            && ! $request->filled('category_id');
+
+        $featured = $showFeatured
+            ? MarketplaceResource::query()
+                ->with(['category', 'author', 'versions'])
+                ->integrated()
+                ->featured()
+                ->popular()
+                ->limit(3)
+                ->get()
+                ->map(fn (MarketplaceResource $resource) => $resource->toIntegratedArray(summary: true))
+                ->all()
+            : [];
+
+        $payload = $resources->toArray();
+        $payload['categories'] = MarketplaceCategory::query()
+            ->visible()
+            ->ordered()
+            ->get(['slug', 'name'])
+            ->map(fn (MarketplaceCategory $category) => [
+                'slug' => $category->slug,
+                'name' => $category->name,
+            ])
+            ->all();
+        $payload['featured'] = $featured;
+
+        return response()->json($payload);
     }
 
     public function show(string $slug): JsonResponse
     {
         $resource = MarketplaceResource::query()
-            ->with(['category', 'author', 'versions'])
+            ->with([
+                'category',
+                'author',
+                'versions',
+                'reviews' => fn ($query) => $query->visible()->with('user')->latest(),
+            ])
             ->integrated()
             ->where('slug', $slug)
             ->firstOrFail();
 
-        return response()->json(['data' => $resource->toIntegratedArray()]);
+        return response()->json([
+            'data' => $resource->toIntegratedArray(includeReviews: true),
+        ]);
     }
 }

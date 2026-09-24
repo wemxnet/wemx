@@ -520,7 +520,40 @@ class MarketplaceTest extends TestCase
         $this->assertTrue($names->contains('Listed module'));
         $this->assertFalse($names->contains('Hidden'));
         $this->assertSame('Free', $response->json('data.0.price'));
-        $this->assertNotEmpty($response->json('data.0.versions'));
+        $this->assertNotEmpty($response->json('data.0.latest_version'));
+        $this->assertArrayNotHasKey('description', $response->json('data.0'));
+        $this->assertArrayNotHasKey('versions', $response->json('data.0'));
+        $this->assertSame(18, $response->json('per_page'));
+        $this->assertNotEmpty($response->json('categories'));
+    }
+
+    public function test_integrated_api_show_includes_versions_and_reviews(): void
+    {
+        $resource = $this->createResource(['name' => 'Detailed module']);
+        $this->createVersion($resource);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        MarketplaceResourceReview::actions()->upsertAsClient([
+            'user_id' => $this->buyer->id,
+            'resource_id' => $resource->id,
+            'rating' => 5,
+            'title' => 'Great free tool',
+            'body' => 'Works well for my client dashboard.',
+        ]);
+
+        $response = $this->getJson('/api/v1/marketplace/resources/'.$resource->slug);
+
+        $response->assertOk()
+            ->assertJsonPath('data.name', 'Detailed module')
+            ->assertJsonPath('data.reviews_count', 1)
+            ->assertJsonPath('data.reviews.0.title', 'Great free tool')
+            ->assertJsonPath('data.versions.0.version', '1.0.0');
+
+        $this->assertNotEmpty($response->json('data.view_url'));
     }
 
     public function test_integrated_paid_download_requires_a_license_key(): void

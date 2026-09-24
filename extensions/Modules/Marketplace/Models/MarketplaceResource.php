@@ -506,7 +506,7 @@ class MarketplaceResource extends Model
     /**
      * @return array<string, mixed>
      */
-    public function toIntegratedArray(): array
+    public function toIntegratedArray(bool $includeReviews = false, bool $summary = false): array
     {
         $this->loadMissing(['category', 'author', 'versions']);
 
@@ -517,25 +517,25 @@ class MarketplaceResource extends Model
                 fn ($collection) => $collection->where('status', VersionStatus::Approved),
             )
             ->sortByDesc('created_at')
-            ->values()
-            ->map(fn (MarketplaceResourceVersion $version) => $version->toIntegratedArray())
-            ->all();
+            ->values();
 
-        return [
+        $payload = [
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
             'short_description' => $this->short_description,
-            'description' => $this->description,
             'icon' => $this->iconUrl(),
+            'initials' => $this->initials(),
             'price' => $this->formattedPrice(),
+            'featured' => $this->isFeaturedNow(),
+            'official' => (bool) $this->is_official,
             'views' => $this->views_count,
             'downloads' => $this->downloads_count,
             'purchases' => $this->purchases_count,
+            'reviews_count' => $this->reviews_count,
+            'reviews_avg' => (float) $this->reviews_avg,
+            'latest_version' => $versions->first()?->version,
             'created_at' => $this->created_at?->toIso8601String(),
-            'source' => $this->source_url,
-            'website' => $this->website_url,
-            'docs' => $this->docs_url,
             'view_url' => $this->clientUrl(),
             'category' => [
                 'id' => $this->category?->id,
@@ -545,9 +545,45 @@ class MarketplaceResource extends Model
             'user' => [
                 'username' => $this->author?->username,
                 'avatar' => $this->author?->getAvatarUrl(),
+                'url' => $this->author ? static::authorProfileUrl($this->author) : null,
             ],
-            'versions' => $versions,
         ];
+
+        if ($summary) {
+            return $payload;
+        }
+
+        $payload['description'] = $this->description;
+        $payload['source'] = $this->source_url;
+        $payload['website'] = $this->website_url;
+        $payload['docs'] = $this->docs_url;
+        $payload['support'] = $this->support_url;
+        $payload['versions'] = $versions
+            ->map(fn (MarketplaceResourceVersion $version) => $version->toIntegratedArray())
+            ->all();
+
+        if ($includeReviews) {
+            $this->loadMissing(['reviews.user']);
+
+            $payload['reviews'] = $this->reviews
+                ->where('is_visible', true)
+                ->sortByDesc('created_at')
+                ->values()
+                ->map(fn (MarketplaceResourceReview $review) => [
+                    'id' => $review->id,
+                    'rating' => $review->rating,
+                    'title' => $review->title,
+                    'body' => $review->body,
+                    'created_at' => $review->created_at?->toIso8601String(),
+                    'user' => [
+                        'username' => $review->user?->username,
+                        'avatar' => $review->user?->getAvatarUrl(),
+                    ],
+                ])
+                ->all();
+        }
+
+        return $payload;
     }
 
     public static function generateSlug(string $name, ?int $ignoreId = null): string

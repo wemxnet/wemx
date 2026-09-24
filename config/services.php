@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'marketplace' => [
+        'url' => env('MARKETPLACE_URL', 'http://wemx.test'),
+    ],
+
 ];
