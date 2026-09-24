@@ -14,7 +14,7 @@ new class extends Component
 
 @php
     $licenses = MarketplaceLicense::query()
-        ->with(['resource.category', 'resource.author', 'sale'])
+        ->with(['resource.category', 'resource.author', 'resource.versions', 'sale'])
         ->where('user_id', auth()->id())
         ->orderByDesc('purchased_at')
         ->orderByDesc('created_at')
@@ -35,6 +35,10 @@ new class extends Component
                 @php
                     $resource = $license->resource;
                     $latest = $resource?->latestApprovedVersion() ?? $resource?->latestVersion();
+                    $downloadableVersions = $resource
+                        ?->versions
+                        ->filter(fn ($version) => $version->isDownloadable($resource))
+                        ?? collect();
                 @endphp
                 <x-theme::card wire:key="purchase-{{ $license->id }}" class="!p-4">
                     <div class="flex flex-wrap items-start gap-4">
@@ -66,8 +70,30 @@ new class extends Component
                             @if($resource)
                                 <a href="{{ $resource->clientUrl() }}" wire:navigate class="block rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">View</a>
                             @endif
-                            @if($latest && $license->status === LicenseStatus::Active && $resource)
-                                <x-theme::button.primary href="{{ route('marketplace.versions.download', $latest) }}" class="text-center">Download</x-theme::button.primary>
+                            @if($license->status === LicenseStatus::Active && $resource && $downloadableVersions->isNotEmpty())
+                                @if($downloadableVersions->count() === 1)
+                                    <x-theme::button.primary href="{{ route('marketplace.versions.download', $downloadableVersions->first()) }}" class="text-center">Download</x-theme::button.primary>
+                                @else
+                                    <details class="group">
+                                        <summary class="block cursor-pointer list-none rounded-lg bg-primary-600 px-5 py-2.5 text-center text-sm font-medium text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400">
+                                            Download version
+                                        </summary>
+                                        <div class="mt-2 space-y-1 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800">
+                                            @foreach($downloadableVersions as $version)
+                                                <a
+                                                    wire:key="purchase-version-{{ $license->id }}-{{ $version->id }}"
+                                                    href="{{ route('marketplace.versions.download', $version) }}"
+                                                    class="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                >
+                                                    v{{ $version->version }}
+                                                    @if($latest && $version->id === $latest->id)
+                                                        <span class="text-xs text-gray-500 dark:text-gray-400">(latest)</span>
+                                                    @endif
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    </details>
+                                @endif
                             @endif
                         </div>
                     </div>

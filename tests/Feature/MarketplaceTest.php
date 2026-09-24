@@ -439,6 +439,69 @@ class MarketplaceTest extends TestCase
         $this->assertSame(1, $version->fresh()->downloads_count);
     }
 
+    public function test_licensed_user_can_download_a_specific_older_version(): void
+    {
+        $resource = $this->createResource(['price' => 12]);
+        $older = $this->createVersion($resource, ['version' => '1.0.0', 'name' => 'Initial']);
+        $older->forceFill(['created_at' => now()->subMinute()])->save();
+        $latest = $this->createVersion($resource, ['version' => '1.1.0', 'name' => 'Update']);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        MarketplaceLicense::actions()->grantAsManager([
+            'actor_user_id' => $this->creator->id,
+            'resource_id' => $resource->id,
+            'user_id' => $this->buyer->id,
+            'notify' => false,
+        ]);
+
+        $this->assertTrue($older->fresh()->isDownloadable($resource));
+        $this->assertTrue($latest->fresh()->isDownloadable($resource));
+
+        MarketplaceResourceVersion::actions()->downloadForUser([
+            'version_id' => $older->id,
+            'user_id' => $this->buyer->id,
+        ]);
+
+        $this->assertSame(1, $older->fresh()->downloads_count);
+        $this->assertSame(0, $latest->fresh()->downloads_count);
+        $this->assertSame(1, $resource->fresh()->downloads_count);
+    }
+
+    public function test_admin_can_grant_purchase_access_to_a_resource(): void
+    {
+        $resource = $this->createResource(['price' => 15]);
+        $this->createVersion($resource);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        $license = MarketplaceLicense::actions()->grantAsManager([
+            'actor_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+            'username' => $this->buyer->email,
+            'payment_method' => 'manual',
+            'notify' => false,
+        ]);
+
+        $this->assertSame(LicenseStatus::Active, $license->status);
+        $this->assertSame($this->buyer->id, $license->user_id);
+        $this->assertSame('manual', $license->source);
+        $this->assertSame(1, $resource->fresh()->purchases_count);
+
+        $results = MarketplaceLicense::query()
+            ->where('resource_id', $resource->id)
+            ->search($this->buyer->username)
+            ->get();
+
+        $this->assertTrue($results->contains('id', $license->id));
+    }
+
     public function test_integrated_api_only_lists_approved_integrated_resources(): void
     {
         $hidden = $this->createResource(['name' => 'Hidden']);

@@ -1,13 +1,19 @@
 <?php
 
 use App\Models\User;
+use Extensions\Modules\Marketplace\Enums\LicenseStatus;
 use Extensions\Modules\Marketplace\Enums\TeamRole;
+use Extensions\Modules\Marketplace\Models\MarketplaceLicense;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
+use Livewire\WithPagination;
 
 new class extends Component
 {
+    use WithPagination;
+
     public int $resourceId;
 
     public string $rejection_reason = '';
@@ -18,11 +24,27 @@ new class extends Component
 
     public string $member_username = '';
 
+    #[Url]
+    public string $access_q = '';
+
+    public string $access_username = '';
+
+    public string $access_payment_method = '';
+
+    public string $access_transaction_id = '';
+
+    public bool $access_notify = true;
+
     public function mount(): void
     {
         $this->is_featured = $this->resource->is_featured;
         $this->is_official = $this->resource->is_official;
         $this->rejection_reason = (string) $this->resource->rejection_reason;
+    }
+
+    public function updatingAccessQ(): void
+    {
+        $this->resetPage();
     }
 
     #[Computed]
@@ -129,13 +151,53 @@ new class extends Component
 
         unset($this->resource);
     }
+
+    public function grantAccess(): void
+    {
+        MarketplaceLicense::actions()->grantAsManager([
+            'actor_user_id' => auth()->id(),
+            'resource_id' => $this->resourceId,
+            'username' => $this->access_username,
+            'payment_method' => $this->access_payment_method ?: null,
+            'transaction_id' => $this->access_transaction_id ?: null,
+            'notify' => $this->access_notify,
+        ]);
+
+        $this->reset(['access_username', 'access_payment_method', 'access_transaction_id']);
+        $this->access_notify = true;
+        $this->resetPage();
+        session()->flash('success', 'Purchase access granted.');
+    }
+
+    public function revokeAccess(int $licenseId): void
+    {
+        MarketplaceLicense::actions()->revoke([
+            'actor_user_id' => auth()->id(),
+            'license_id' => $licenseId,
+        ]);
+
+        session()->flash('success', 'Access revoked.');
+    }
 }
 
 ?>
 
-@php $resource = $this->resource; @endphp
+@php
+    $resource = $this->resource;
+    $licenses = MarketplaceLicense::query()
+        ->with(['user', 'sale', 'granter'])
+        ->where('resource_id', $resourceId)
+        ->search($this->access_q)
+        ->orderByDesc('purchased_at')
+        ->orderByDesc('created_at')
+        ->paginate(20);
+@endphp
 
 <div>
+    @if(session('success'))
+        <div class="alert alert-success mb-3">{{ session('success') }}</div>
+    @endif
+
     <div class="row">
         <div class="col-lg-8">
             <div class="card mb-3">
@@ -170,9 +232,96 @@ new class extends Component
                                         <div class="text-secondary small">Extract <code>{{ $version->extract_path }}</code></div>
                                     @endif
                                 </div>
+                                @if($version->isDownloadable($resource))
+                                    <a href="{{ route('marketplace.versions.download', $version) }}" class="btn btn-sm btn-outline-primary">Download</a>
+                                @endif
                             </div>
                         </div>
                     @endforeach
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Access</h3>
+                </div>
+                <div class="card-body border-bottom">
+                    <h4 class="mb-3">Grant purchase access</h4>
+                    <form wire:submit="grantAccess" class="row g-2">
+                        <div class="col-md-6">
+                            <input class="form-control" wire:model="access_username" placeholder="Username or email">
+                            @error('username') <x-admin::form.error :message="$message"/> @enderror
+                        </div>
+                        <div class="col-md-3">
+                            <input class="form-control" wire:model="access_payment_method" placeholder="Payment method (optional)">
+                        </div>
+                        <div class="col-md-3">
+                            <input class="form-control" wire:model="access_transaction_id" placeholder="Transaction ID (optional)">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" wire:model="access_notify">
+                                <span class="form-check-label">Email the customer about their access</span>
+                            </label>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary" type="submit">Add user</button>
+                        </div>
+                    </form>
+                    <p class="text-secondary small mt-2 mb-0">Grants download and purchase access to this resource.</p>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-3">
+                        <div>
+                            <h4 class="mb-1">Users with access</h4>
+                            <p class="text-secondary small mb-0">Customers who purchased, downloaded for free, or were granted access.</p>
+                        </div>
+                        <div class="w-100 w-md-auto" style="min-width: 16rem;">
+                            <input type="search" class="form-control" wire:model.live.debounce.300ms="access_q" placeholder="Search user, key, payment…">
+                        </div>
+                    </div>
+
+                    @if($licenses->isEmpty())
+                        <p class="text-secondary mb-0">
+                            {{ $this->access_q !== '' ? 'No matching users.' : 'No users have access yet.' }}
+                        </p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-vcenter">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Purchased</th>
+                                        <th>Payment</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($licenses as $license)
+                                        <tr wire:key="admin-access-{{ $license->id }}">
+                                            <td>
+                                                <div>{{ $license->user?->username }}</div>
+                                                <div class="text-secondary small">{{ $license->user?->email }}</div>
+                                                <div class="text-secondary small"><code>{{ $license->license_key }}</code></div>
+                                            </td>
+                                            <td>{{ $license->purchasedAt()?->format('Y-m-d') ?? '—' }}</td>
+                                            <td>{{ $license->paymentMethodLabel() }}</td>
+                                            <td>{{ $license->status->label() }}</td>
+                                            <td class="text-end">
+                                                @if($license->status === LicenseStatus::Active)
+                                                    <button type="button" class="btn btn-link btn-sm text-danger" wire:click="revokeAccess({{ $license->id }})" wire:confirm="Revoke this user's access?">Revoke</button>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @if($licenses->hasPages())
+                            <div class="mt-3">{{ $licenses->links() }}</div>
+                        @endif
+                    @endif
                 </div>
             </div>
 
@@ -200,7 +349,7 @@ new class extends Component
                             <button class="btn btn-primary w-100" type="submit">Add collaborator</button>
                         </div>
                     </form>
-                    <p class="text-secondary small mt-2 mb-0">Collaborators get full access to this resource.</p>
+                    <p class="text-secondary small mt-2 mb-0">Collaborators get full access to manage this resource.</p>
                 </div>
             </div>
         </div>

@@ -160,6 +160,7 @@ new class extends Component
     $paymentMethods = $resource->gatewayConfigs->where('is_enabled', true)->values();
     $hasGateway = $paymentMethods->isNotEmpty();
     $canReview = $resource->canBeReviewedBy($user);
+    $canDownloadVersions = $resource->isFree() || $license || $canManage;
     $myReview = $this->myReview;
     $reviews = MarketplaceResourceReview::query()
         ->with('user')
@@ -279,6 +280,15 @@ new class extends Component
                                         @endif
                                         @if($version->available_on_integrated_marketplace)
                                             <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">One-click install</span>
+                                        @endif
+                                        @if($canDownloadVersions && $version->isDownloadable($resource))
+                                            @auth
+                                                <x-theme::button.primary href="{{ route('marketplace.versions.download', $version) }}" class="!px-3 !py-1.5 text-xs">
+                                                    Download
+                                                </x-theme::button.primary>
+                                            @else
+                                                <a href="{{ route('login') }}" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400">Sign in to download</a>
+                                            @endauth
                                         @endif
                                     </div>
                                 </div>

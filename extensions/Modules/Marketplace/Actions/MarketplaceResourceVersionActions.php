@@ -232,15 +232,7 @@ class MarketplaceResourceVersionActions extends Action
 
     protected function versionIsDownloadable(MarketplaceResource $resource, MarketplaceResourceVersion $version): bool
     {
-        if ($version->status === VersionStatus::Rejected) {
-            return false;
-        }
-
-        if ($resource->status === ResourceStatus::Approved) {
-            return true;
-        }
-
-        return $version->status === VersionStatus::Approved;
+        return $version->isDownloadable($resource);
     }
 
     /**

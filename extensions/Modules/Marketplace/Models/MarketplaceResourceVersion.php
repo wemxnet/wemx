@@ -4,6 +4,7 @@ namespace Extensions\Modules\Marketplace\Models;
 
 use App\Models\User;
 use Extensions\Modules\Marketplace\Actions\MarketplaceResourceVersionActions;
+use Extensions\Modules\Marketplace\Enums\ResourceStatus;
 use Extensions\Modules\Marketplace\Enums\VersionStatus;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Builder;
@@ -109,6 +110,21 @@ class MarketplaceResourceVersion extends Model
         }
 
         return $bytes.' B';
+    }
+
+    public function isDownloadable(?MarketplaceResource $resource = null): bool
+    {
+        if ($this->status === VersionStatus::Rejected) {
+            return false;
+        }
+
+        $resource ??= $this->resource;
+
+        if ($resource->status === ResourceStatus::Approved) {
+            return true;
+        }
+
+        return $this->status === VersionStatus::Approved;
     }
 
     public function storageDisk(): Filesystem
