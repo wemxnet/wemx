@@ -12,27 +12,29 @@ use Extensions\Modules\Marketplace\Models\MarketplaceCategory;
 use Extensions\Modules\Marketplace\Models\MarketplaceCreatorGatewayConfig;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceTeamMember;
+use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
 use Extensions\Modules\Marketplace\Support\MarketplaceNotifier;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
 
 class MarketplaceResourceActions extends Action
 {
     use AuthorizesMarketplaceStaff;
 
-    public const MAX_ICON_KILOBYTES = 2048;
-
     public function createAsCreator(array $input): MarketplaceResource
     {
         $validated = Validator::make($input, $this->rules())->validate();
 
         $user = $this->user((int) $validated['user_id']);
+        MarketplaceLimits::assertCanCreateResource($user);
         $category = MarketplaceCategory::query()->visible()->findOrFail($validated['category_id']);
 
-        $icon = $this->storeIcon($validated['icon'] ?? null);
+        $icon = isset($validated['icon']) ? $this->storeIcon($validated['icon']) : null;
 
         $gatewayIds = $this->normalizeGatewayIds($validated);
 
@@ -154,6 +156,47 @@ class MarketplaceResourceActions extends Action
         }
 
         return $resource;
+    }
+
+    public function uploadIconAsCreator(array $input): MarketplaceResource
+    {
+        $validated = Validator::make($input, array_merge([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+        ], self::iconRules(required: true)))->validate();
+
+        $user = $this->user((int) $validated['user_id']);
+        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
+        $this->assertCanManageResource($user, $resource, TeamRole::Manager);
+
+        $icon = $this->storeIcon($validated['icon']);
+        $this->deleteIcon($resource);
+        $resource->update([
+            'icon_disk' => $icon['disk'],
+            'icon_path' => $icon['path'],
+        ]);
+
+        return $resource->fresh(['category', 'author', 'teamMembers.user', 'gatewayConfigs']);
+    }
+
+    public function removeIconAsCreator(array $input): MarketplaceResource
+    {
+        $validated = Validator::make($input, [
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+        ])->validate();
+
+        $user = $this->user((int) $validated['user_id']);
+        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
+        $this->assertCanManageResource($user, $resource, TeamRole::Manager);
+
+        $this->deleteIcon($resource);
+        $resource->update([
+            'icon_disk' => null,
+            'icon_path' => null,
+        ]);
+
+        return $resource->fresh(['category', 'author', 'teamMembers.user', 'gatewayConfigs']);
     }
 
     public function attachGateway(array $input): MarketplaceResource
@@ -414,6 +457,15 @@ class MarketplaceResourceActions extends Action
             ]);
         }
 
+        $alreadyMember = MarketplaceResourceTeamMember::query()
+            ->where('resource_id', $resource->id)
+            ->where('user_id', $validated['user_id'])
+            ->exists();
+
+        if (! $alreadyMember) {
+            MarketplaceLimits::assertCanAddTeamMember($resource);
+        }
+
         $member = MarketplaceResourceTeamMember::query()->updateOrCreate(
             [
                 'resource_id' => $resource->id,
@@ -497,7 +549,7 @@ class MarketplaceResourceActions extends Action
             'slug' => ['nullable', 'string', 'max:140'],
             'short_description' => [$required, 'string', 'max:240'],
             'description' => [$required, 'string', 'max:100000'],
-            'icon' => ['nullable', 'file', 'image', 'max:'.self::MAX_ICON_KILOBYTES],
+            'icon' => self::iconRules()['icon'],
             'website_url' => ['nullable', 'url', 'max:255'],
             'docs_url' => ['nullable', 'url', 'max:255'],
             'source_url' => ['nullable', 'url', 'max:255'],
@@ -511,18 +563,60 @@ class MarketplaceResourceActions extends Action
     }
 
     /**
-     * @return array{disk: string, path: string}|null
+     * @return array<string, mixed>
      */
-    protected function storeIcon(?UploadedFile $file): ?array
+    public static function iconRules(bool $required = false): array
     {
-        if (! $file) {
-            return null;
+        return [
+            'icon' => array_filter([
+                $required ? 'required' : 'nullable',
+                'file',
+                File::image(allowSvg: false)
+                    ->types(['jpg', 'jpeg', 'png', 'gif', 'webp'])
+                    ->max(MarketplaceLimits::maxIconKilobytes()),
+            ]),
+        ];
+    }
+
+    /**
+     * @return array{disk: string, path: string}
+     */
+    protected function storeIcon(UploadedFile $file): array
+    {
+        $info = @getimagesize($file->getRealPath());
+
+        if ($info === false || ! in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP], true)) {
+            throw ValidationException::withMessages([
+                'icon' => 'The icon must be a valid JPEG, PNG, GIF, or WebP image.',
+            ]);
         }
 
-        $path = $file->store('marketplace/icons', 'public');
+        $maxDimension = 1024;
+
+        if ($info[0] > $maxDimension || $info[1] > $maxDimension) {
+            throw ValidationException::withMessages([
+                'icon' => "The icon must not exceed {$maxDimension}×{$maxDimension} pixels.",
+            ]);
+        }
+
+        $extension = match ($info[2]) {
+            IMAGETYPE_JPEG => 'jpg',
+            IMAGETYPE_PNG => 'png',
+            IMAGETYPE_GIF => 'gif',
+            IMAGETYPE_WEBP => 'webp',
+            default => throw ValidationException::withMessages([
+                'icon' => 'The icon must be a valid JPEG, PNG, GIF, or WebP image.',
+            ]),
+        };
+
+        $path = $file->storeAs(
+            'marketplace/icons',
+            Str::uuid().'.'.$extension,
+            'local',
+        );
 
         return [
-            'disk' => 'public',
+            'disk' => 'local',
             'path' => $path,
         ];
     }

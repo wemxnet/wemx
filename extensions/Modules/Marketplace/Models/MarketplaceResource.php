@@ -457,16 +457,19 @@ class MarketplaceResource extends Model
             return null;
         }
 
-        if ($this->icon_disk === 'public') {
-            return Storage::disk('public')->url($this->icon_path);
-        }
+        $version = $this->updated_at?->timestamp ?? $this->created_at?->timestamp ?? time();
 
-        return url('/marketplace/icons/'.$this->slug);
+        return route('marketplace.icons', $this).'?v='.$version;
     }
 
     public function initials(): string
     {
-        $words = preg_split('/\s+/', trim((string) $this->name)) ?: [];
+        return self::initialsForName($this->name);
+    }
+
+    public static function initialsForName(?string $name): string
+    {
+        $words = preg_split('/\s+/', trim((string) $name)) ?: [];
         $words = array_values(array_filter($words, fn (string $word): bool => $word !== ''));
 
         if (count($words) >= 2) {
@@ -616,7 +619,7 @@ class MarketplaceResource extends Model
             ->map(fn ($tag) => Str::slug(trim((string) $tag)))
             ->filter()
             ->unique()
-            ->take(16)
+            ->take(max(1, (int) config('marketplace.max_tags_per_resource', 10)))
             ->values()
             ->all();
     }

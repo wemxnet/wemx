@@ -114,17 +114,6 @@
                 </x-admin::navigation.sidebar-item>
                 @endperm
 
-                @perm('admin.integrated-marketplace')
-                <x-admin::navigation.sidebar-item
-                    title="Marketplace"
-                    :href="route('admin.integrated-marketplace.index')"
-                    :active="$activePage === 'integrated-marketplace'">
-                    <x-slot name="icon">
-                        <x-admin::icon icon="building-store" outline/>
-                    </x-slot>
-                </x-admin::navigation.sidebar-item>
-                @endperm
-
                 <!-- Packages -->
                 @perm('admin.packages.index')
                 <x-admin::navigation.sidebar-item
@@ -321,6 +310,17 @@
                 <li class="nav-item mt-2 mb-1">
                     <div class="text-muted text-uppercase px-3 small">Third Party</div>
                 </li>
+
+                @perm('admin.integrated-marketplace')
+                <x-admin::navigation.sidebar-item
+                    title="Marketplace"
+                    :href="route('admin.marketplace.index')"
+                    :active="$activePage === 'marketplace'">
+                    <x-slot name="icon">
+                        <x-admin::icon icon="building-store" outline/>
+                    </x-slot>
+                </x-admin::navigation.sidebar-item>
+                @endperm
 
                 <!-- Installed Extensions -->
                 @perm('admin.extensions.index')

@@ -151,6 +151,21 @@ class MarketplaceLicense extends Model
         return $this->purchased_at ?? $this->sale?->paid_at ?? $this->created_at;
     }
 
+    public function sourceLabel(): string
+    {
+        return match ($this->source) {
+            'purchase' => 'Purchase',
+            'free' => 'Free download',
+            'manual' => 'Granted access',
+            default => Str::headline((string) $this->source),
+        };
+    }
+
+    public function belongsToUser(User $user): bool
+    {
+        return (int) $this->user_id === (int) $user->id;
+    }
+
     public static function generateKey(): string
     {
         do {

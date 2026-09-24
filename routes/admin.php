@@ -56,12 +56,12 @@ Route::group(['prefix' => 'pages'], function () {
     Route::get('/edit/{page:id}', [Admin\PagesController::class, 'edit'])->name('pages.edit')->middleware('permission:admin.pages.update');
 });
 
-Route::group(['prefix' => 'integrated-marketplace'], function () {
+Route::group(['prefix' => 'marketplace'], function () {
     Route::get('/', [Admin\IntegratedMarketplaceController::class, 'index'])
-        ->name('integrated-marketplace.index')
+        ->name('marketplace.index')
         ->middleware('permission:admin.integrated-marketplace');
     Route::get('/{slug}', [Admin\IntegratedMarketplaceController::class, 'show'])
-        ->name('integrated-marketplace.show')
+        ->name('marketplace.show')
         ->middleware('permission:admin.integrated-marketplace')
         ->where('slug', '[A-Za-z0-9\-]+');
 });

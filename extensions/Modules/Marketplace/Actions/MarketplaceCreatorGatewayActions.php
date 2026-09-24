@@ -6,6 +6,7 @@ use App\Actions\Action;
 use Extensions\Modules\Marketplace\Actions\Concerns\AuthorizesMarketplaceStaff;
 use Extensions\Modules\Marketplace\Gateways\CreatorGatewayRegistry;
 use Extensions\Modules\Marketplace\Models\MarketplaceCreatorGatewayConfig;
+use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +20,7 @@ class MarketplaceCreatorGatewayActions extends Action
         $validated = Validator::make($input, $this->rules())->validate();
 
         $user = $this->user((int) $validated['user_id']);
+        MarketplaceLimits::assertCanCreateCreatorGateway($user);
         $gateway = CreatorGatewayRegistry::make($validated['driver']);
         $credentials = $gateway->validateCredentials($validated['credentials'] ?? []);
 

@@ -118,7 +118,7 @@ new class extends Component
 
         session()->flash('success', 'Resource deleted.');
 
-        return $this->redirect(route('admin.marketplace.resources.index'), navigate: true);
+        return $this->redirect(route('admin.marketplace-manager.resources.index'), navigate: true);
     }
 
     public function addMember(): void

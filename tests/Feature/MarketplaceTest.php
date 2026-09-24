@@ -16,6 +16,7 @@ use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceReview;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceVersion;
 use Extensions\Modules\Marketplace\Models\MarketplaceSale;
+use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -60,6 +61,7 @@ class MarketplaceTest extends TestCase
         config([
             'app.installed' => true,
             'app.license_key' => 'WMX-TESTING-KEY',
+            'marketplace' => require base_path('extensions/Modules/Marketplace/Config/config.php'),
         ]);
         Cache::put('lcs_checked_at', now(), 21600);
 
@@ -68,7 +70,9 @@ class MarketplaceTest extends TestCase
 
         $this->admin = User::factory()->create();
         $this->creator = User::factory()->create();
+        $this->creator->forceFill(['created_at' => now()->subDays(4)])->save();
         $this->buyer = User::factory()->create();
+        $this->buyer->forceFill(['created_at' => now()->subDays(4)])->save();
         $this->category = MarketplaceCategory::query()->where('slug', 'module')->firstOrFail();
     }
 
@@ -600,6 +604,76 @@ class MarketplaceTest extends TestCase
         $this->assertNull($resource->iconUrl());
     }
 
+    public function test_resource_icon_can_be_uploaded_and_served(): void
+    {
+        $resource = MarketplaceResource::actions()->createAsCreator([
+            'user_id' => $this->creator->id,
+            'category_id' => $this->category->id,
+            'name' => 'Icon module',
+            'short_description' => 'Has a custom icon.',
+            'description' => 'Icon test resource.',
+            'icon' => UploadedFile::fake()->image('icon.png', 128, 128),
+        ]);
+
+        $resource->refresh();
+
+        $this->assertSame('local', $resource->icon_disk);
+        $this->assertNotNull($resource->icon_path);
+        $this->assertTrue(Storage::disk('local')->exists($resource->icon_path));
+        $this->assertStringStartsWith(route('marketplace.icons', $resource), $resource->iconUrl());
+
+        $this->actingAs($this->creator)
+            ->get($resource->iconUrl())
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+    }
+
+    public function test_invalid_resource_icon_upload_is_rejected(): void
+    {
+        $resource = $this->createResource();
+
+        $this->expectException(ValidationException::class);
+
+        MarketplaceResource::actions()->uploadIconAsCreator([
+            'user_id' => $this->creator->id,
+            'resource_id' => $resource->id,
+            'icon' => UploadedFile::fake()->create('icon.txt', 10, 'text/plain'),
+        ]);
+    }
+
+    public function test_creator_can_upload_and_remove_resource_icon_via_routes(): void
+    {
+        $resource = $this->createResource();
+
+        $this->actingAs($this->creator)
+            ->post(route('marketplace.studio.resources.icon.update', $resource), [
+                'icon' => UploadedFile::fake()->image('icon.png', 128, 128),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $resource->refresh();
+        $this->assertNotNull($resource->icon_path);
+
+        $this->actingAs($this->creator)
+            ->delete(route('marketplace.studio.resources.icon.destroy', $resource))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertNull($resource->fresh()->icon_path);
+    }
+
+    public function test_buyer_cannot_upload_resource_icon(): void
+    {
+        $resource = $this->createResource();
+
+        $this->actingAs($this->buyer)
+            ->post(route('marketplace.studio.resources.icon.update', $resource), [
+                'icon' => UploadedFile::fake()->image('icon.png', 128, 128),
+            ])
+            ->assertForbidden();
+    }
+
     public function test_marketplace_emails_are_sent_for_lifecycle_events(): void
     {
         $resource = $this->createResource(['name' => 'Notify Module']);
@@ -834,6 +908,37 @@ class MarketplaceTest extends TestCase
         $this->get('/marketplace/library/purchases')->assertRedirect();
     }
 
+    public function test_buyer_can_view_purchase_details_for_their_license(): void
+    {
+        $resource = $this->createResource(['name' => 'Buyer detail resource', 'price' => 10]);
+        $this->createVersion($resource);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        $license = MarketplaceLicense::actions()->grantAsManager([
+            'actor_user_id' => $this->creator->id,
+            'resource_id' => $resource->id,
+            'user_id' => $this->buyer->id,
+            'payment_method' => 'manual',
+            'transaction_id' => 'TEST-ORDER-001',
+            'notify' => false,
+        ]);
+
+        $this->actingAs($this->buyer)
+            ->get(route('marketplace.library.purchases.show', $license))
+            ->assertOk()
+            ->assertSee('Buyer detail resource')
+            ->assertSee('TEST-ORDER-001')
+            ->assertSee($license->license_key);
+
+        $this->actingAs($this->creator)
+            ->get(route('marketplace.library.purchases.show', $license))
+            ->assertNotFound();
+    }
+
     public function test_admin_can_mark_a_resource_official(): void
     {
         $resource = $this->createResource();
@@ -1000,6 +1105,56 @@ class MarketplaceTest extends TestCase
 
         $this->get('/marketplace/authors/nobody-here-'.uniqid())
             ->assertNotFound();
+    }
+
+    public function test_creator_cannot_exceed_marketplace_resource_limit(): void
+    {
+        for ($index = 0; $index < 15; $index++) {
+            $resource = $this->createResource(['name' => 'Resource '.$index]);
+            MarketplaceResource::actions()->approveAsAdmin([
+                'admin_user_id' => $this->admin->id,
+                'resource_id' => $resource->id,
+            ]);
+        }
+
+        $this->expectException(ValidationException::class);
+
+        $this->createResource(['name' => 'One too many']);
+    }
+
+    public function test_young_account_cannot_create_marketplace_resource(): void
+    {
+        $this->creator->forceFill(['created_at' => now()])->save();
+
+        $this->expectException(ValidationException::class);
+
+        $this->createResource(['name' => 'Too soon']);
+    }
+
+    public function test_resource_version_limit_blocks_additional_uploads(): void
+    {
+        $resource = $this->createResource();
+
+        foreach (['1.0.0', '1.0.1', '1.0.2', '1.0.3', '1.0.4'] as $version) {
+            $this->createVersion($resource, ['version' => $version, 'name' => 'Release '.$version]);
+        }
+
+        $this->expectException(ValidationException::class);
+
+        $this->createVersion($resource, ['version' => '1.0.5', 'name' => 'Blocked']);
+    }
+
+    public function test_popular_resources_unlock_more_version_slots(): void
+    {
+        $resource = $this->createResource();
+        $resource->update(['downloads_count' => 1500]);
+
+        $this->assertSame(8, MarketplaceLimits::maxVersionsFor($resource->fresh()));
+    }
+
+    public function test_version_upload_limit_is_five_megabytes(): void
+    {
+        $this->assertSame(5120, MarketplaceLimits::maxUploadKilobytes());
     }
 
     public function test_browse_sort_supports_downloads_and_free_popular(): void

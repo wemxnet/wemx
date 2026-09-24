@@ -4,7 +4,7 @@
 @endphp
 
 <div class="col-sm-6 col-lg-4" wire:key="resource-{{ $resource['slug'] }}">
-    <a href="{{ route('admin.integrated-marketplace.show', $resource['slug']) }}" wire:navigate class="card card-link h-100">
+    <a href="{{ route('admin.marketplace.show', $resource['slug']) }}" wire:navigate class="card card-link h-100">
         <div class="card-body">
             <div class="d-flex gap-3">
                 @include('admin::integrated-marketplace.partials.icon', ['resource' => $resource, 'size' => 48])

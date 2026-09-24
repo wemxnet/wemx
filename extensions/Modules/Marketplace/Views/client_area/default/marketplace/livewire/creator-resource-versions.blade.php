@@ -4,6 +4,7 @@ use Extensions\Modules\Marketplace\Enums\ResourceStatus;
 use Extensions\Modules\Marketplace\Enums\TeamRole;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceVersion;
+use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
@@ -113,6 +114,9 @@ new class extends Component
     $canVersion = $resource->userCan(auth()->user(), TeamRole::Developer);
     $versions = $resource->versions;
     $canDelete = $versions->count() > 1;
+    $maxVersions = MarketplaceLimits::maxVersionsFor($resource);
+    $atVersionLimit = $versions->count() >= $maxVersions;
+    $maxUploadMegabytes = number_format(MarketplaceLimits::maxUploadKilobytes() / 1024, 0);
 @endphp
 
 <div>
@@ -156,9 +160,17 @@ new class extends Component
             </div>
         @endif
 
-        @if($canVersion)
+        @if($canVersion && $atVersionLimit)
+            <x-theme::alert.warning
+                class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700"
+                :text="'This resource has reached its version limit ('.$maxVersions.'). More slots unlock as downloads increase.'"
+            />
+        @elseif($canVersion)
             <form wire:submit="addVersion" class="mt-6 space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
-                <h3 class="font-medium text-gray-900 dark:text-white">{{ $versions->isEmpty() ? 'Initial version' : 'Upload a version' }}</h3>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="font-medium text-gray-900 dark:text-white">{{ $versions->isEmpty() ? 'Initial version' : 'Upload a version' }}</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ $versions->count() }} / {{ $maxVersions }} versions · max {{ $maxUploadMegabytes }} MB</p>
+                </div>
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
                         <x-theme::form.label for="version_name" text="Version name"/>
@@ -190,6 +202,7 @@ new class extends Component
                 <div>
                     <x-theme::form.label for="package" text="Zip file"/>
                     <x-theme::form.file id="package" wire:model="package" accept=".zip,application/zip"/>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Zip files only, up to {{ $maxUploadMegabytes }} MB.</p>
                     <div wire:loading wire:target="package" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Uploading…</div>
                     @if($package)
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Selected: {{ $package->getClientOriginalName() }}</p>

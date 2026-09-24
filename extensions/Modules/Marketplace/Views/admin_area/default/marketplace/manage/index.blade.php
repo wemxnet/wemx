@@ -1,5 +1,5 @@
 @extends('admin::layouts.wrapper', [
-    'activePage' => 'marketplace-manage',
+    'activePage' => 'marketplace-manager-manage',
 ])
 
 @section('title', 'Marketplace resources')

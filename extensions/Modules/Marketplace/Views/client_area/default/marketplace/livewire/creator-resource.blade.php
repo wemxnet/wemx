@@ -1,16 +1,23 @@
 <?php
 
+use Extensions\Modules\Marketplace\Actions\MarketplaceResourceActions;
 use Extensions\Modules\Marketplace\Enums\ResourceStatus;
 use Extensions\Modules\Marketplace\Enums\TeamRole;
 use Extensions\Modules\Marketplace\Models\MarketplaceCategory;
 use Extensions\Modules\Marketplace\Models\MarketplaceCreatorGatewayConfig;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
+use Livewire\WithFileUploads;
 
 new class extends Component
 {
+    use WithFileUploads;
+
     public int $resourceId;
+
+    public $icon = null;
 
     public string $name = '';
 
@@ -97,6 +104,40 @@ new class extends Component
         $this->showPreview = ! $this->showPreview;
     }
 
+    public function updatedIcon(): void
+    {
+        if (! $this->icon) {
+            return;
+        }
+
+        try {
+            MarketplaceResource::actions()->uploadIconAsCreator([
+                'user_id' => auth()->id(),
+                'resource_id' => $this->resourceId,
+                'icon' => $this->icon,
+            ]);
+
+            $this->reset('icon');
+            unset($this->resource);
+            session()->flash('success', 'Icon updated.');
+        } catch (ValidationException $exception) {
+            $this->addError('icon', collect($exception->errors())->flatten()->first());
+            $this->reset('icon');
+        }
+    }
+
+    public function removeIcon(): void
+    {
+        MarketplaceResource::actions()->removeIconAsCreator([
+            'user_id' => auth()->id(),
+            'resource_id' => $this->resourceId,
+        ]);
+
+        $this->reset('icon');
+        unset($this->resource);
+        session()->flash('success', 'Icon removed.');
+    }
+
     public function save(): void
     {
         MarketplaceResource::actions()->updateAsCreator([
@@ -163,6 +204,17 @@ new class extends Component
     $resource = $this->resource;
     $canEdit = $resource->userCan(auth()->user(), TeamRole::Manager);
     $canDelete = $resource->userCan(auth()->user(), TeamRole::Owner);
+    $iconPreviewUrl = null;
+
+    if ($icon) {
+        try {
+            $iconPreviewUrl = $icon->temporaryUrl();
+        } catch (\Throwable) {
+            $iconPreviewUrl = null;
+        }
+    } else {
+        $iconPreviewUrl = $resource->iconUrl();
+    }
 @endphp
 
 <div>
@@ -178,6 +230,12 @@ new class extends Component
 
         @if($canEdit)
             <form wire:submit="save" class="space-y-4">
+                <x-marketplace::icon-upload-field
+                    :previewUrl="$iconPreviewUrl"
+                    :initials="$resource->initials()"
+                    :showRemove="$resource->iconUrl() !== null"
+                    class="mb-2"
+                />
                 <div>
                     <x-theme::form.label for="name" text="Name"/>
                     <x-theme::form.input id="name" wire:model="name"/>

@@ -40,7 +40,7 @@ class IntegratedMarketplaceTest extends TestCase
         ]);
 
         $this->actingAsMarketplaceAdmin()
-            ->get(route('admin.integrated-marketplace.index'))
+            ->get(route('admin.marketplace.index'))
             ->assertOk()
             ->assertSee('Demo module')
             ->assertSee('Featured')
@@ -49,7 +49,7 @@ class IntegratedMarketplaceTest extends TestCase
             ->assertDontSee('<h2 class="mb-1">Marketplace</h2>', false);
 
         $this->actingAsMarketplaceAdmin()
-            ->get(route('admin.integrated-marketplace.index'))
+            ->get(route('admin.marketplace.index'))
             ->assertOk();
 
         Http::assertSentCount(1);
@@ -75,7 +75,7 @@ class IntegratedMarketplaceTest extends TestCase
         ]);
 
         $this->actingAsMarketplaceAdmin()
-            ->get(route('admin.integrated-marketplace.show', 'demo-module'))
+            ->get(route('admin.marketplace.show', 'demo-module'))
             ->assertOk()
             ->assertSee('Resource')
             ->assertSee('Versions')

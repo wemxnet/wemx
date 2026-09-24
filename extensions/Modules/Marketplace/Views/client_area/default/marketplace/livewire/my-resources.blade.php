@@ -1,6 +1,8 @@
 <?php
 
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
+use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
+use Illuminate\Validation\ValidationException;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 
@@ -13,6 +15,16 @@ new class extends Component
 
 @php
     $userId = auth()->id();
+    $canCreateResource = true;
+    $createBlockedMessage = null;
+
+    try {
+        MarketplaceLimits::assertCanCreateResource(auth()->user());
+    } catch (ValidationException $exception) {
+        $canCreateResource = false;
+        $createBlockedMessage = collect($exception->errors())->flatten()->first();
+    }
+
     $resources = MarketplaceResource::query()
         ->with('category')
         ->where(function ($query) use ($userId) {
@@ -24,8 +36,14 @@ new class extends Component
 @endphp
 
 <div>
+    @if(! $canCreateResource && $createBlockedMessage)
+        <x-theme::alert.warning :text="$createBlockedMessage" class="mb-4" />
+    @endif
+
     <div class="mb-4 flex justify-end">
-        <x-theme::button.primary href="{{ route('marketplace.studio.create') }}" wire:navigate>New resource</x-theme::button.primary>
+        @if($canCreateResource)
+            <x-theme::button.primary href="{{ route('marketplace.studio.create') }}" wire:navigate>New resource</x-theme::button.primary>
+        @endif
     </div>
 
     @if($resources->isEmpty())

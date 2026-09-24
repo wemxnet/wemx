@@ -9,6 +9,8 @@ return [
     'sales' => 'Sales',
     'licenses' => 'Purchases',
     'my_purchases' => 'My Purchases',
+    'marketplace_purchases' => 'Marketplace Purchases',
+    'purchase_details' => 'Purchase details',
     'my_resources' => 'My Resources',
     'gateways' => 'Payment methods',
     'featured' => 'Featured',

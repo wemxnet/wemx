@@ -2,12 +2,22 @@
 
 use Extensions\Modules\Marketplace\Enums\LicenseStatus;
 use Extensions\Modules\Marketplace\Models\MarketplaceLicense;
+use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 
 new class extends Component
 {
     use WithPagination;
+
+    #[Url]
+    public string $q = '';
+
+    public function updatingQ(): void
+    {
+        $this->resetPage();
+    }
 }
 
 ?>
@@ -16,18 +26,33 @@ new class extends Component
     $licenses = MarketplaceLicense::query()
         ->with(['resource.category', 'resource.author', 'resource.versions', 'sale'])
         ->where('user_id', auth()->id())
+        ->search($this->q)
         ->orderByDesc('purchased_at')
         ->orderByDesc('created_at')
         ->paginate(12);
 @endphp
 
 <div>
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+            {{ $licenses->total() }} {{ Str::plural('purchase', $licenses->total()) }}
+        </p>
+        <div class="sm:w-80">
+            <x-theme::form.input type="search" wire:model.live.debounce.300ms="q" placeholder="Search resource, license key, transaction…"/>
+        </div>
+    </div>
+
     @if($licenses->isEmpty())
         <x-theme::card>
-            <x-theme::empty-state title="No purchases yet" description="When you buy a marketplace resource, it will show up here with download access." />
-            <div class="mt-4">
-                <x-theme::button.primary href="{{ route('marketplace.index') }}" wire:navigate>Browse marketplace</x-theme::button.primary>
-            </div>
+            <x-theme::empty-state
+                title="{{ $this->q !== '' ? 'No matching purchases' : 'No purchases yet' }}"
+                :description="$this->q !== '' ? 'Try a different search term.' : 'When you buy a marketplace resource, it will show up here with your license and download access.'"
+            />
+            @if($this->q === '')
+                <div class="mt-4">
+                    <x-theme::button.primary href="{{ route('marketplace.index') }}" wire:navigate>Browse marketplace</x-theme::button.primary>
+                </div>
+            @endif
         </x-theme::card>
     @else
         <div class="space-y-3">
@@ -61,14 +86,15 @@ new class extends Component
                                     <dd class="mt-0.5 font-medium text-gray-800 dark:text-gray-200">{{ $license->paymentMethodLabel() }}</dd>
                                 </div>
                                 <div>
-                                    <dt class="uppercase tracking-wide">License</dt>
-                                    <dd class="mt-0.5 break-all font-mono text-[11px] text-gray-800 dark:text-gray-200">{{ $license->license_key }}</dd>
+                                    <dt class="uppercase tracking-wide">Access</dt>
+                                    <dd class="mt-0.5 font-medium text-gray-800 dark:text-gray-200">{{ $license->sourceLabel() }}</dd>
                                 </div>
                             </dl>
                         </div>
                         <div class="flex w-full flex-col gap-2 sm:w-auto">
+                            <a href="{{ route('marketplace.library.purchases.show', $license) }}" wire:navigate class="block rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Purchase details</a>
                             @if($resource)
-                                <a href="{{ $resource->clientUrl() }}" wire:navigate class="block rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">View</a>
+                                <a href="{{ $resource->clientUrl() }}" wire:navigate class="block rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">View resource</a>
                             @endif
                             @if($license->status === LicenseStatus::Active && $resource && $downloadableVersions->isNotEmpty())
                                 @if($downloadableVersions->count() === 1)

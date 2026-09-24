@@ -11,6 +11,7 @@ use Extensions\Modules\Marketplace\Models\MarketplaceDownload;
 use Extensions\Modules\Marketplace\Models\MarketplaceLicense;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceVersion;
+use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
 use Extensions\Modules\Marketplace\Support\MarketplaceNotifier;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -23,8 +24,6 @@ class MarketplaceResourceVersionActions extends Action
 {
     use AuthorizesMarketplaceStaff;
 
-    public const MAX_UPLOAD_KILOBYTES = 102400;
-
     public function createAsCreator(array $input): MarketplaceResourceVersion
     {
         $validated = Validator::make($input, $this->rules(), [
@@ -34,6 +33,8 @@ class MarketplaceResourceVersionActions extends Action
         $user = $this->user((int) $validated['user_id']);
         $resource = MarketplaceResource::findOrFail($validated['resource_id']);
         $this->assertCanManageResource($user, $resource, TeamRole::Developer);
+        MarketplaceLimits::assertAccountAgeEligible($user);
+        MarketplaceLimits::assertCanCreateVersion($resource);
 
         $extractPath = $this->normalizeExtractPath(
             $validated['extract_path'] ?? $resource->category?->default_extract_path,
@@ -251,7 +252,7 @@ class MarketplaceResourceVersionActions extends Action
             'notify_customers' => ['sometimes', 'boolean'],
             'extract_path' => ['nullable', 'string', 'max:255'],
             'rename_extract_to' => ['nullable', 'string', 'max:120', 'regex:/^[A-Za-z0-9._\-]+$/'],
-            'file' => ['required', 'file', 'max:'.self::MAX_UPLOAD_KILOBYTES, 'mimes:zip'],
+            'file' => ['required', 'file', 'max:'.MarketplaceLimits::maxUploadKilobytes(), 'mimes:zip'],
         ];
     }
 

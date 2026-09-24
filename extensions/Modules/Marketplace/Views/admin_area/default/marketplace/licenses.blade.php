@@ -1,5 +1,5 @@
 @extends('admin::layouts.wrapper', [
-    'activePage' => 'marketplace-licenses',
+    'activePage' => 'marketplace-manager-licenses',
 ])
 
 @section('title', 'Marketplace licenses')

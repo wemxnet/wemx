@@ -79,7 +79,7 @@ new class extends Component {}
                 </div>
                 <div class="list-group list-group-flush">
                     @forelse($queue as $resource)
-                        <a href="{{ route('admin.marketplace.resources.show', $resource) }}" wire:navigate wire:key="queue-{{ $resource->id }}" class="list-group-item list-group-item-action">
+                        <a href="{{ route('admin.marketplace-manager.resources.show', $resource) }}" wire:navigate wire:key="queue-{{ $resource->id }}" class="list-group-item list-group-item-action">
                             <div class="fw-medium">{{ $resource->name }}</div>
                             <div class="text-secondary small">{{ $resource->category?->name }} · {{ $resource->author?->username }}</div>
                         </a>
@@ -96,7 +96,7 @@ new class extends Component {}
                 </div>
                 <div class="list-group list-group-flush">
                     @forelse($popular as $resource)
-                        <a href="{{ route('admin.marketplace.resources.show', $resource) }}" wire:navigate wire:key="pop-{{ $resource->id }}" class="list-group-item list-group-item-action">
+                        <a href="{{ route('admin.marketplace-manager.resources.show', $resource) }}" wire:navigate wire:key="pop-{{ $resource->id }}" class="list-group-item list-group-item-action">
                             <div class="d-flex justify-content-between">
                                 <span class="fw-medium">{{ $resource->name }}</span>
                                 <span class="text-secondary small">{{ $resource->views_count + $resource->downloads_count }}</span>

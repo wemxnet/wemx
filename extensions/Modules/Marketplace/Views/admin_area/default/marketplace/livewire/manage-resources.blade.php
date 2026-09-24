@@ -86,7 +86,7 @@ new class extends Component
                     @forelse($resources as $resource)
                         <tr wire:key="res-{{ $resource->id }}">
                             <td>
-                                <a href="{{ route('admin.marketplace.resources.show', $resource) }}" wire:navigate>{{ $resource->name }}</a>
+                                <a href="{{ route('admin.marketplace-manager.resources.show', $resource) }}" wire:navigate>{{ $resource->name }}</a>
                                 <div class="text-secondary">{{ $resource->category?->name }} · {{ $resource->formattedPrice() }}</div>
                             </td>
                             <td>{{ $resource->author?->username }}</td>
@@ -104,7 +104,7 @@ new class extends Component
                             </td>
                             <td>{{ $resource->views_count }} views · {{ $resource->downloads_count }} downloads</td>
                             <td class="text-end">
-                                <a href="{{ route('admin.marketplace.resources.show', $resource) }}" wire:navigate>Review</a>
+                                <a href="{{ route('admin.marketplace-manager.resources.show', $resource) }}" wire:navigate>Review</a>
                             </td>
                         </tr>
                     @empty

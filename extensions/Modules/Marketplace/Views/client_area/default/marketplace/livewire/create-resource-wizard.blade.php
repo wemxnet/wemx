@@ -1,7 +1,10 @@
 <?php
 
+use Extensions\Modules\Marketplace\Actions\MarketplaceResourceActions;
 use Extensions\Modules\Marketplace\Models\MarketplaceCategory;
 use Extensions\Modules\Marketplace\Models\MarketplaceResource;
+use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
@@ -38,9 +41,20 @@ new class extends Component
 
     public bool $showPreview = false;
 
+    public bool $canCreate = true;
+
+    public ?string $createBlockedMessage = null;
+
     public function mount(): void
     {
         abort_unless(auth()->check(), 403);
+
+        try {
+            MarketplaceLimits::assertCanCreateResource(auth()->user());
+        } catch (ValidationException $exception) {
+            $this->canCreate = false;
+            $this->createBlockedMessage = collect($exception->errors())->flatten()->first();
+        }
 
         $first = $this->categories->first();
         $this->category_id = $first?->id;
@@ -57,15 +71,27 @@ new class extends Component
         $this->showPreview = ! $this->showPreview;
     }
 
+    public function updatedIcon(): void
+    {
+        if (! $this->icon) {
+            return;
+        }
+
+        $this->validate(MarketplaceResourceActions::iconRules());
+    }
+
     public function saveResource(): mixed
     {
-        $resource = MarketplaceResource::actions()->createAsCreator([
+        if ($this->icon) {
+            $this->validate(MarketplaceResourceActions::iconRules());
+        }
+
+        $payload = [
             'user_id' => auth()->id(),
             'category_id' => $this->category_id,
             'name' => $this->name,
             'short_description' => $this->short_description,
             'description' => $this->description,
-            'icon' => $this->icon,
             'website_url' => $this->website_url ?: null,
             'docs_url' => $this->docs_url ?: null,
             'source_url' => $this->source_url ?: null,
@@ -74,7 +100,13 @@ new class extends Component
             'license_type' => $this->license_type,
             'tags' => $this->tags,
             'available_on_integrated_marketplace' => $this->available_on_integrated_marketplace,
-        ]);
+        ];
+
+        if ($this->icon) {
+            $payload['icon'] = $this->icon;
+        }
+
+        $resource = MarketplaceResource::actions()->createAsCreator($payload);
 
         session()->flash('success', 'Listing saved. Upload the first downloadable version.');
 
@@ -84,10 +116,26 @@ new class extends Component
 
 ?>
 
+@php
+    $iconPreviewUrl = null;
+
+    if ($icon) {
+        try {
+            $iconPreviewUrl = $icon->temporaryUrl();
+        } catch (\Throwable) {
+            $iconPreviewUrl = null;
+        }
+    }
+@endphp
+
 <div>
+    @if(! $canCreate)
+        <x-theme::alert.warning :text="$createBlockedMessage" class="mb-4" />
+    @endif
+
     <x-theme::card class="mb-4">
         <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Resource</h2>
-        <form wire:submit="saveResource" class="space-y-5">
+        <form wire:submit="saveResource" class="space-y-5" @disabled(! $canCreate)>
             <div>
                 <x-theme::form.label for="name" text="Name"/>
                 <x-theme::form.input id="name" wire:model="name" placeholder="Pterodactyl extra eggs"/>
@@ -117,15 +165,11 @@ new class extends Component
                     </select>
                 </div>
             </div>
-            <div>
-                <x-theme::form.label for="icon" text="Icon (optional)"/>
-                <x-theme::form.file id="icon" wire:model="icon" accept="image/*"/>
-                <div wire:loading wire:target="icon" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Uploading…</div>
-                @if($icon)
-                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Selected: {{ $icon->getClientOriginalName() }}</p>
-                @endif
-                @error('icon') <x-theme::form.error :text="$message"/> @enderror
-            </div>
+            <x-marketplace::icon-upload-field
+                :previewUrl="$iconPreviewUrl"
+                :initials="MarketplaceResource::initialsForName($name)"
+                label="Icon (optional)"
+            />
             <div>
                 <x-theme::form.label for="description" text="Markdown description"/>
                 <x-marketplace::markdown-composer
@@ -172,7 +216,7 @@ new class extends Component
             </div>
             <x-theme::form.toggle wire:model="available_on_integrated_marketplace" text="Available on the integrated marketplace"/>
             <div class="flex justify-end">
-                <x-theme::button.primary type="submit" wire:loading.attr="disabled">Continue to versions</x-theme::button.primary>
+                <x-theme::button.primary type="submit" wire:loading.attr="disabled" wire:target="icon, saveResource" :disabled="! $canCreate">Continue to versions</x-theme::button.primary>
             </div>
         </form>
     </x-theme::card>

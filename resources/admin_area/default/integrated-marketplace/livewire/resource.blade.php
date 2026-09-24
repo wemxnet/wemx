@@ -57,7 +57,7 @@ new class extends Component
 
 <div>
     <div class="mb-3">
-        <a href="{{ route('admin.integrated-marketplace.index') }}" wire:navigate class="text-secondary">Marketplace</a>
+        <a href="{{ route('admin.marketplace.index') }}" wire:navigate class="text-secondary">Marketplace</a>
         <span class="text-secondary px-1">/</span>
         <span class="text-secondary">{{ $resource['category']['name'] ?? 'Resource' }}</span>
         <span class="text-secondary px-1">/</span>
@@ -73,7 +73,7 @@ new class extends Component
             <p class="empty-title">Resource unavailable</p>
             <p class="empty-subtitle text-secondary">This listing is not on the marketplace, or the catalog could not be loaded.</p>
             <div class="empty-action">
-                <a href="{{ route('admin.integrated-marketplace.index') }}" wire:navigate class="btn btn-primary">Back to marketplace</a>
+                <a href="{{ route('admin.marketplace.index') }}" wire:navigate class="btn btn-primary">Back to marketplace</a>
             </div>
         </div>
     @else

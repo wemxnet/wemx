@@ -49,6 +49,25 @@ class MarketplaceController extends Controller
         abort_unless($resource->isVisibleTo(auth()->user()), 404);
         abort_unless($resource->icon_path && $resource->icon_disk, 404);
 
-        return $resource->iconDisk()->response($resource->icon_path);
+        $disk = $resource->iconDisk();
+
+        abort_unless($disk->exists($resource->icon_path), 404);
+
+        $extension = strtolower(pathinfo($resource->icon_path, PATHINFO_EXTENSION));
+        $mime = match ($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'application/octet-stream',
+        };
+
+        abort_if($mime === 'application/octet-stream', 404);
+
+        return $disk->response($resource->icon_path, null, [
+            'Content-Type' => $mime,
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'public, max-age=604800',
+        ]);
     }
 }

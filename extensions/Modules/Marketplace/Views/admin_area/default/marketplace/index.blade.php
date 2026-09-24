@@ -1,5 +1,5 @@
 @extends('admin::layouts.wrapper', [
-    'activePage' => 'marketplace',
+    'activePage' => 'marketplace-manager',
 ])
 
 @section('title', 'Marketplace')
@@ -8,7 +8,7 @@
     <div class="col-auto ms-auto d-print-none">
         <div class="btn-list">
             @perm('admin.marketplace.manage')
-                <x-admin::button href="{{ route('admin.marketplace.resources.index') }}" wire:navigate>Manage resources</x-admin::button>
+                <x-admin::button href="{{ route('admin.marketplace-manager.resources.index') }}" wire:navigate>Manage resources</x-admin::button>
             @endperm
         </div>
     </div>

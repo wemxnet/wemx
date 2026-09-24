@@ -25,6 +25,7 @@ Route::middleware('web')->group(function () {
 
     Route::middleware('auth')->group(function () {
         Route::get('/marketplace/library/purchases', [Client\LibraryController::class, 'purchases'])->name('marketplace.library.purchases');
+        Route::get('/marketplace/library/purchases/{license}', [Client\LibraryController::class, 'showPurchase'])->name('marketplace.library.purchases.show');
         Route::get('/marketplace/library/resources', [Client\LibraryController::class, 'resources'])->name('marketplace.library.resources');
         Route::get('/marketplace/studio', [Client\CreatorController::class, 'index'])->name('marketplace.studio.index');
         Route::get('/marketplace/studio/create', [Client\CreatorController::class, 'create'])->name('marketplace.studio.create');
@@ -35,6 +36,12 @@ Route::middleware('web')->group(function () {
         Route::get('/marketplace/studio/resources/{resource}/versions', [Client\CreatorController::class, 'versions'])->name('marketplace.studio.resources.versions');
         Route::get('/marketplace/studio/resources/{resource}/licenses', [Client\CreatorController::class, 'resourceLicenses'])->name('marketplace.studio.resources.licenses');
         Route::get('/marketplace/studio/resources/{resource}/team', [Client\CreatorController::class, 'team'])->name('marketplace.studio.resources.team');
+        Route::post('/marketplace/studio/resources/{resource}/icon', [Client\CreatorController::class, 'updateIcon'])
+            ->middleware('throttle:20,1')
+            ->name('marketplace.studio.resources.icon.update');
+        Route::delete('/marketplace/studio/resources/{resource}/icon', [Client\CreatorController::class, 'destroyIcon'])
+            ->middleware('throttle:20,1')
+            ->name('marketplace.studio.resources.icon.destroy');
 
         Route::post('/marketplace/{resource}/purchase', [Client\PurchaseController::class, 'start'])->name('marketplace.purchase');
         Route::get('/marketplace/checkout/{sale}/paypal', [Client\PurchaseController::class, 'paypal'])->name('marketplace.checkout.paypal');
@@ -53,19 +60,19 @@ Route::middleware(['web', 'auth', 'admin', RequireAdminReauthentication::class])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::get('/marketplace', [Admin\MarketplaceController::class, 'index'])
+        Route::get('/marketplace-manager', [Admin\MarketplaceController::class, 'index'])
             ->middleware('permission:admin.marketplace')
-            ->name('marketplace.index');
-        Route::get('/marketplace/resources', [Admin\MarketplaceController::class, 'resources'])
+            ->name('marketplace-manager.index');
+        Route::get('/marketplace-manager/resources', [Admin\MarketplaceController::class, 'resources'])
             ->middleware('permission:admin.marketplace.manage')
-            ->name('marketplace.resources.index');
-        Route::get('/marketplace/resources/{resource}', [Admin\MarketplaceController::class, 'show'])
+            ->name('marketplace-manager.resources.index');
+        Route::get('/marketplace-manager/resources/{resource}', [Admin\MarketplaceController::class, 'show'])
             ->middleware('permission:admin.marketplace.manage')
-            ->name('marketplace.resources.show');
-        Route::get('/marketplace/sales', [Admin\MarketplaceController::class, 'sales'])
+            ->name('marketplace-manager.resources.show');
+        Route::get('/marketplace-manager/sales', [Admin\MarketplaceController::class, 'sales'])
             ->middleware('permission:admin.marketplace')
-            ->name('marketplace.sales.index');
-        Route::get('/marketplace/licenses', [Admin\MarketplaceController::class, 'licenses'])
+            ->name('marketplace-manager.sales.index');
+        Route::get('/marketplace-manager/licenses', [Admin\MarketplaceController::class, 'licenses'])
             ->middleware('permission:admin.marketplace')
-            ->name('marketplace.licenses.index');
+            ->name('marketplace-manager.licenses.index');
     });
