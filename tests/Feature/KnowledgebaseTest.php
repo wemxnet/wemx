@@ -9,6 +9,7 @@ use Extensions\Modules\Knowledgebase\Models\KnowledgebaseCategory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
+use Livewire\Volt\Volt;
 use Tests\TestCase;
 
 class KnowledgebaseTest extends TestCase
@@ -28,6 +29,9 @@ class KnowledgebaseTest extends TestCase
         $this->artisan('migrate', [
             '--path' => 'extensions/Modules/Knowledgebase/Migrations',
         ]);
+
+        $this->app['view']->addNamespace('knowledgebase', base_path('extensions/Modules/Knowledgebase/Views'));
+        Volt::mount(base_path('extensions/Modules/Knowledgebase/Views'));
 
         if (! Route::has('knowledgebase.index')) {
             require base_path('extensions/Modules/Knowledgebase/routes.php');
@@ -287,5 +291,23 @@ class KnowledgebaseTest extends TestCase
         $this->assertTrue(
             KnowledgebaseArticle::query()->visibleTo($this->admin)->search('secret-token-xyz')->exists()
         );
+    }
+
+    public function test_suggested_articles_render_with_an_empty_query(): void
+    {
+        $this->actingAs($this->customer);
+
+        Volt::test('client_area.default.knowledgebase.livewire.suggested-articles', ['query' => ''])
+            ->assertOk()
+            ->assertDontSee('These articles might already answer this');
+    }
+
+    public function test_suggested_articles_list_matches_for_the_ticket_subject(): void
+    {
+        $this->actingAs($this->customer);
+
+        Volt::test('client_area.default.knowledgebase.livewire.suggested-articles', ['query' => 'Welcome'])
+            ->assertOk()
+            ->assertSee('Welcome to the knowledgebase');
     }
 }

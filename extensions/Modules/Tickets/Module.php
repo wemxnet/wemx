@@ -139,7 +139,7 @@ class Module extends ModuleExtension
 
     public function onEnable(): void
     {
-        //
+        $this->migrate('extensions/Modules/Tickets/Migrations');
     }
 
     public function onDisable(): void

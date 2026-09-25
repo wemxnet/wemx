@@ -247,7 +247,7 @@ new class extends Component
             @if($tab === 'details')
                 <div class="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <h2 class="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Description</h2>
-                    <div class="prose prose-sm max-w-none text-gray-700 dark:prose-invert dark:text-gray-200 [&_*]:text-inherit">
+                    <div class="format format-blue dark:format-invert max-w-none">
                         {!! $resource->renderedDescription() !!}
                     </div>
                 </div>
@@ -292,7 +292,7 @@ new class extends Component
                                         @endif
                                     </div>
                                 </div>
-                                <div class="prose prose-sm mt-3 max-w-none text-gray-700 dark:prose-invert dark:text-gray-200 [&_*]:text-inherit">{!! $version->renderedChangelog() !!}</div>
+                                <div class="format format-blue dark:format-invert mt-3 max-w-none">{!! $version->renderedChangelog() !!}</div>
                             </div>
                         </div>
                     @empty
