@@ -176,7 +176,7 @@ new class extends Component
                     id="resource-description"
                     wire:model="description"
                     :showPreview="$showPreview"
-                    :previewHtml="\Illuminate\Support\Str::markdown($description, ['html_input' => 'strip', 'allow_unsafe_links' => false])"
+                    :previewHtml="\Extensions\Modules\Marketplace\Support\MarketplaceMarkdown::render($description)"
                     :rows="12"
                 />
                 @error('description') <x-theme::form.error :text="$message"/> @enderror

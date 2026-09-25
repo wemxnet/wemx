@@ -13,6 +13,7 @@ use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceVersion;
 use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
 use Extensions\Modules\Marketplace\Support\MarketplaceNotifier;
+use Extensions\Modules\Marketplace\Support\MarketplaceUploads;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -163,7 +164,7 @@ class MarketplaceResourceVersionActions extends Action
             ]);
         }
 
-        if ($version->integrated_marketplace_only) {
+        if ($version->integrated_marketplace_only && ! $resource->staffCanManage($user)) {
             throw ValidationException::withMessages([
                 'version_id' => 'This version can only be downloaded from the integrated marketplace.',
             ]);
@@ -262,7 +263,7 @@ class MarketplaceResourceVersionActions extends Action
             'notify_customers' => ['sometimes', 'boolean'],
             'extract_path' => ['nullable', 'string', 'max:255'],
             'rename_extract_to' => ['nullable', 'string', 'max:120', 'regex:/^[A-Za-z0-9._\-]+$/'],
-            'file' => ['required', 'file', 'max:'.MarketplaceLimits::maxUploadKilobytes(), 'mimes:zip'],
+            'file' => ['required', 'file', 'max:'.MarketplaceLimits::maxUploadKilobytes(), 'extensions:zip', 'mimes:zip'],
         ];
     }
 
@@ -271,13 +272,15 @@ class MarketplaceResourceVersionActions extends Action
      */
     protected function storeUpload(UploadedFile $file, MarketplaceResource $resource): array
     {
+        MarketplaceUploads::assertZip($file);
+
         $directory = 'marketplace/versions/'.$resource->id;
         $filename = Str::uuid().'.zip';
         $path = $file->storeAs($directory, $filename, 'local');
 
         return [
             'path' => $path,
-            'original_name' => $file->getClientOriginalName(),
+            'original_name' => MarketplaceUploads::safeZipName($file->getClientOriginalName()),
             'mime_type' => $file->getMimeType(),
             'size' => $file->getSize(),
             'checksum' => hash_file('sha256', $file->getRealPath()),
@@ -316,7 +319,12 @@ class MarketplaceResourceVersionActions extends Action
         ?MarketplaceLicense $license,
         string $source,
     ): StreamedResponse {
-        if (! $version->storageDisk()->exists($version->path)) {
+        if (
+            ! is_string($version->path)
+            || ! str_starts_with($version->path, 'marketplace/versions/')
+            || str_contains($version->path, '..')
+            || ! $version->storageDisk()->exists($version->path)
+        ) {
             throw ValidationException::withMessages([
                 'version_id' => 'The download file is missing.',
             ]);

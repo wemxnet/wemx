@@ -22,6 +22,8 @@ new class extends Component
 
     public bool $is_official = false;
 
+    public string $version_limit = '';
+
     public string $member_username = '';
 
     #[Url]
@@ -39,6 +41,7 @@ new class extends Component
     {
         $this->is_featured = $this->resource->is_featured;
         $this->is_official = $this->resource->is_official;
+        $this->version_limit = $this->resource->version_limit === null ? '' : (string) $this->resource->version_limit;
         $this->rejection_reason = (string) $this->resource->rejection_reason;
     }
 
@@ -107,6 +110,18 @@ new class extends Component
         ]);
 
         unset($this->resource);
+    }
+
+    public function saveVersionLimit(): void
+    {
+        MarketplaceResource::actions()->setVersionLimitAsAdmin([
+            'admin_user_id' => auth()->id(),
+            'resource_id' => $this->resourceId,
+            'version_limit' => $this->version_limit === '' ? null : (int) $this->version_limit,
+        ]);
+
+        unset($this->resource);
+        session()->flash('success', 'Version limit updated.');
     }
 
     public function deleteResource(): mixed
@@ -217,6 +232,19 @@ new class extends Component
                 <div class="card-header">
                     <h3 class="card-title">Versions</h3>
                 </div>
+                <div class="card-body border-bottom">
+                    <form wire:submit="saveVersionLimit" class="row g-2 align-items-end">
+                        <div class="col-sm-6">
+                            <label class="form-label" for="version_limit">Version limit</label>
+                            <input id="version_limit" type="number" min="1" max="1000" class="form-control" wire:model="version_limit" placeholder="Default (10)">
+                            <div class="form-hint">Leave empty to use the default of 10, plus extra slots as downloads grow.</div>
+                            @error('version_limit') <x-admin::form.error :message="$message"/> @enderror
+                        </div>
+                        <div class="col-sm-auto">
+                            <button type="submit" class="btn btn-primary">Save limit</button>
+                        </div>
+                    </form>
+                </div>
                 <div class="list-group list-group-flush">
                     @foreach($resource->versions as $version)
                         <div class="list-group-item" wire:key="admin-ver-{{ $version->id }}">
@@ -232,7 +260,7 @@ new class extends Component
                                         <div class="text-secondary small">Extract <code>{{ $version->extract_path }}</code></div>
                                     @endif
                                 </div>
-                                @if($version->downloadableFromExtensionMarketplace($resource))
+                                @if($version->downloadableFromExtensionMarketplace($resource, auth()->user()))
                                     <a href="{{ route('marketplace.versions.download', $version) }}" class="btn btn-sm btn-outline-primary">Download</a>
                                 @endif
                             </div>

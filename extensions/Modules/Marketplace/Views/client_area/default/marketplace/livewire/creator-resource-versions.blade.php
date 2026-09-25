@@ -166,7 +166,9 @@ new class extends Component
         @if($canVersion && $atVersionLimit)
             <x-theme::alert.warning
                 class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700"
-                :text="'This resource has reached its version limit ('.$maxVersions.'). More slots unlock as downloads increase.'"
+                :text="$resource->version_limit !== null
+                    ? 'This resource has reached its version limit ('.$maxVersions.').'
+                    : 'This resource has reached its version limit ('.$maxVersions.'). More slots unlock as downloads increase.'"
             />
         @elseif($canVersion)
             <form wire:submit="addVersion" class="mt-6 space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
@@ -197,7 +199,7 @@ new class extends Component
                         wire:model="changelog"
                         placeholder="What’s new in this release. Markdown is supported."
                         :showPreview="$showPreview"
-                        :previewHtml="\Illuminate\Support\Str::markdown($changelog, ['html_input' => 'strip', 'allow_unsafe_links' => false])"
+                        :previewHtml="\Extensions\Modules\Marketplace\Support\MarketplaceMarkdown::render($changelog)"
                         :rows="6"
                     />
                     @error('changelog') <x-theme::form.error :text="$message"/> @enderror

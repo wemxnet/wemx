@@ -7,6 +7,7 @@ use Extensions\Modules\Marketplace\Actions\MarketplaceResourceActions;
 use Extensions\Modules\Marketplace\Enums\ResourceStatus;
 use Extensions\Modules\Marketplace\Enums\TeamRole;
 use Extensions\Modules\Marketplace\Enums\VersionStatus;
+use Extensions\Modules\Marketplace\Support\MarketplaceMarkdown;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -48,6 +49,7 @@ class MarketplaceResource extends Model
         'views_count',
         'downloads_count',
         'purchases_count',
+        'version_limit',
         'reviews_count',
         'reviews_avg',
         'published_at',
@@ -85,6 +87,7 @@ class MarketplaceResource extends Model
             'views_count' => 'integer',
             'downloads_count' => 'integer',
             'purchases_count' => 'integer',
+            'version_limit' => 'integer',
             'reviews_count' => 'integer',
             'reviews_avg' => 'float',
             'published_at' => 'datetime',
@@ -483,10 +486,7 @@ class MarketplaceResource extends Model
 
     public function renderedDescription(): string
     {
-        return Str::markdown($this->description ?? '', [
-            'html_input' => 'strip',
-            'allow_unsafe_links' => false,
-        ]);
+        return MarketplaceMarkdown::render($this->description);
     }
 
     public function clientUrl(): string

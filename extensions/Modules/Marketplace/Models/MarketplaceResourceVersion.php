@@ -6,13 +6,13 @@ use App\Models\User;
 use Extensions\Modules\Marketplace\Actions\MarketplaceResourceVersionActions;
 use Extensions\Modules\Marketplace\Enums\ResourceStatus;
 use Extensions\Modules\Marketplace\Enums\VersionStatus;
+use Extensions\Modules\Marketplace\Support\MarketplaceMarkdown;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class MarketplaceResourceVersion extends Model
 {
@@ -94,10 +94,7 @@ class MarketplaceResourceVersion extends Model
 
     public function renderedChangelog(): string
     {
-        return Str::markdown($this->changelog ?: '*No changelog provided.*', [
-            'html_input' => 'strip',
-            'allow_unsafe_links' => false,
-        ]);
+        return MarketplaceMarkdown::render($this->changelog ?: '*No changelog provided.*');
     }
 
     public function humanSize(): string
@@ -130,9 +127,19 @@ class MarketplaceResourceVersion extends Model
         return $this->status === VersionStatus::Approved;
     }
 
-    public function downloadableFromExtensionMarketplace(?MarketplaceResource $resource = null): bool
+    public function downloadableFromExtensionMarketplace(?MarketplaceResource $resource = null, ?User $user = null): bool
     {
-        return $this->isDownloadable($resource) && ! $this->integrated_marketplace_only;
+        if (! $this->isDownloadable($resource)) {
+            return false;
+        }
+
+        if (! $this->integrated_marketplace_only) {
+            return true;
+        }
+
+        $resource ??= $this->resource;
+
+        return $resource->staffCanManage($user);
     }
 
     public function storageDisk(): Filesystem

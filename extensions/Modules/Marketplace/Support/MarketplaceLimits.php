@@ -42,7 +42,11 @@ final class MarketplaceLimits
 
     public static function maxVersionsFor(MarketplaceResource $resource): int
     {
-        $base = max(1, (int) config('marketplace.max_versions_per_resource', 5));
+        if ($resource->version_limit !== null) {
+            return max(1, (int) $resource->version_limit);
+        }
+
+        $base = max(1, (int) config('marketplace.max_versions_per_resource', 10));
         $milestone = max(1, (int) config('marketplace.version_download_milestone', 500));
         $bonusPerMilestone = max(0, (int) config('marketplace.max_versions_bonus_per_milestone', 1));
         $absolute = max($base, (int) config('marketplace.max_versions_absolute', 25));
@@ -126,11 +130,12 @@ final class MarketplaceLimits
         $max = self::maxVersionsFor($resource);
 
         if ($current >= $max) {
+            $message = $resource->version_limit !== null
+                ? sprintf('This resource can have up to %d version(s).', $max)
+                : sprintf('This resource can have up to %d version(s). Popular resources unlock more slots as downloads grow.', $max);
+
             throw ValidationException::withMessages([
-                $attribute => sprintf(
-                    'This resource can have up to %d version(s). Popular resources unlock more slots as downloads grow.',
-                    $max,
-                ),
+                $attribute => $message,
             ]);
         }
     }

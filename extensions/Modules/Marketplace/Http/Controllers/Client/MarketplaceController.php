@@ -47,7 +47,12 @@ class MarketplaceController extends Controller
     public function icon(MarketplaceResource $resource): StreamedResponse
     {
         abort_unless($resource->isVisibleTo(auth()->user()), 404);
-        abort_unless($resource->icon_path && $resource->icon_disk, 404);
+        abort_unless(
+            $resource->icon_disk === 'local'
+            && is_string($resource->icon_path)
+            && preg_match('#^marketplace/icons/[A-Za-z0-9-]+\.(jpg|png|gif|webp)$#', $resource->icon_path) === 1,
+            404,
+        );
 
         $disk = $resource->iconDisk();
 

@@ -51,7 +51,7 @@ new class extends Component
         $this->name = '';
         $this->resetCredentialFields();
         unset($this->configs);
-        session()->flash('success', 'Payment method saved. Credentials are stored encrypted.');
+        session()->flash('success', 'Payment method saved.');
     }
 
     public function toggle(int $id): void
@@ -85,7 +85,7 @@ new class extends Component
 <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
     <div>
         <h1 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">Payment methods</h1>
-        <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">These methods are separate from WemX billing gateways. Attach one to each paid resource. Secrets are encrypted at rest.</p>
+        <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">These methods are separate from WemX billing gateways. Attach one to each paid resource.</p>
 
         @if(session('success'))
             <x-theme::alert.success :text="session('success')" />
@@ -145,6 +145,6 @@ new class extends Component
                 @error("credentials.$key") <x-theme::form.error :text="$message"/> @enderror
             </div>
         @endforeach
-        <x-theme::button.primary type="submit">Save encrypted method</x-theme::button.primary>
+        <x-theme::button.primary type="submit">Save method</x-theme::button.primary>
     </form>
 </div>

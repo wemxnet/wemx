@@ -282,7 +282,7 @@ new class extends Component
                                         @if($version->available_on_integrated_marketplace)
                                             <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">One-click install</span>
                                         @endif
-                                        @if($canDownloadVersions && $version->downloadableFromExtensionMarketplace($resource))
+                                        @if(($canDownloadVersions || $resource->staffCanManage($user)) && $version->downloadableFromExtensionMarketplace($resource, $user))
                                             @auth
                                                 <x-theme::button.primary href="{{ route('marketplace.versions.download', $version) }}" class="!px-3 !py-1.5 text-xs">
                                                     Download
@@ -439,7 +439,7 @@ new class extends Component
                 @endif
 
                 <div class="mt-4 space-y-2">
-                    @if($latest && $latest->downloadableFromExtensionMarketplace($resource) && ($resource->isFree() || $license || $canManage))
+                    @if($latest && $latest->downloadableFromExtensionMarketplace($resource, $user) && ($resource->isFree() || $license || $canManage || $resource->staffCanManage($user)))
                         <x-theme::button.primary href="{{ route('marketplace.versions.download', $latest) }}" class="block w-full text-center">
                             Download {{ $latest->version }}
                         </x-theme::button.primary>

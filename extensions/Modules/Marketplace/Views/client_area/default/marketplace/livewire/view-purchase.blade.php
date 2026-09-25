@@ -31,7 +31,7 @@ new class extends Component
     $latest = $resource?->latestApprovedVersion() ?? $resource?->latestVersion();
     $downloadableVersions = $resource
         ?->versions
-        ->filter(fn ($version) => $version->downloadableFromExtensionMarketplace($resource))
+        ->filter(fn ($version) => $version->downloadableFromExtensionMarketplace($resource, auth()->user()))
         ?? collect();
 @endphp
 

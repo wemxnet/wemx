@@ -14,6 +14,7 @@ use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceTeamMember;
 use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
 use Extensions\Modules\Marketplace\Support\MarketplaceNotifier;
+use Extensions\Modules\Marketplace\Support\MarketplaceUploads;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -358,6 +359,24 @@ class MarketplaceResourceActions extends Action
         return $resource->fresh(['category', 'author', 'teamMembers.user']);
     }
 
+    public function setVersionLimitAsAdmin(array $input): MarketplaceResource
+    {
+        $validated = Validator::make($input, [
+            'admin_user_id' => ['required', 'integer', 'exists:users,id'],
+            'resource_id' => ['required', 'integer', 'exists:marketplace_resources,id'],
+            'version_limit' => ['nullable', 'integer', 'min:1', 'max:1000'],
+        ])->validate();
+
+        $this->staffUser((int) $validated['admin_user_id']);
+        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
+
+        $resource->update([
+            'version_limit' => $validated['version_limit'],
+        ]);
+
+        return $resource->fresh(['category', 'author', 'teamMembers.user']);
+    }
+
     public function setDisabledAsCreator(array $input): MarketplaceResource
     {
         $validated = Validator::make($input, [
@@ -599,21 +618,9 @@ class MarketplaceResourceActions extends Action
             ]);
         }
 
-        $extension = match ($info[2]) {
-            IMAGETYPE_JPEG => 'jpg',
-            IMAGETYPE_PNG => 'png',
-            IMAGETYPE_GIF => 'gif',
-            IMAGETYPE_WEBP => 'webp',
-            default => throw ValidationException::withMessages([
-                'icon' => 'The icon must be a valid JPEG, PNG, GIF, or WebP image.',
-            ]),
-        };
-
-        $path = $file->storeAs(
-            'marketplace/icons',
-            Str::uuid().'.'.$extension,
-            'local',
-        );
+        $encoded = MarketplaceUploads::reencodeImage($file->getRealPath(), $info[2]);
+        $path = 'marketplace/icons/'.Str::uuid().'.'.$encoded['extension'];
+        Storage::disk('local')->put($path, $encoded['binary']);
 
         return [
             'disk' => 'local',

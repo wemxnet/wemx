@@ -17,6 +17,7 @@ use Extensions\Modules\Marketplace\Models\MarketplaceResourceReview;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceVersion;
 use Extensions\Modules\Marketplace\Models\MarketplaceSale;
 use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
+use Extensions\Modules\Marketplace\Support\MarketplaceMarkdown;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Volt\Volt;
 use Tests\TestCase;
+use ZipArchive;
 
 class MarketplaceTest extends TestCase
 {
@@ -610,6 +612,14 @@ class MarketplaceTest extends TestCase
         ]);
 
         $this->assertSame(1, $version->fresh()->downloads_count);
+        $this->assertTrue($version->downloadableFromExtensionMarketplace($resource, $this->admin));
+
+        MarketplaceResourceVersion::actions()->downloadForUser([
+            'version_id' => $version->id,
+            'user_id' => $this->admin->id,
+        ]);
+
+        $this->assertSame(2, $version->fresh()->downloads_count);
     }
 
     public function test_integrated_marketplace_only_requires_integrated_downloads(): void
@@ -1182,13 +1192,34 @@ class MarketplaceTest extends TestCase
     {
         $resource = $this->createResource();
 
-        foreach (['1.0.0', '1.0.1', '1.0.2', '1.0.3', '1.0.4'] as $version) {
+        foreach (['1.0.0', '1.0.1', '1.0.2', '1.0.3', '1.0.4', '1.0.5', '1.0.6', '1.0.7', '1.0.8', '1.0.9'] as $version) {
             $this->createVersion($resource, ['version' => $version, 'name' => 'Release '.$version]);
         }
 
         $this->expectException(ValidationException::class);
 
-        $this->createVersion($resource, ['version' => '1.0.5', 'name' => 'Blocked']);
+        $this->createVersion($resource, ['version' => '1.0.10', 'name' => 'Blocked']);
+    }
+
+    public function test_admin_can_set_a_resource_version_limit(): void
+    {
+        $resource = $this->createResource();
+
+        MarketplaceResource::actions()->setVersionLimitAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+            'version_limit' => 2,
+        ]);
+
+        $resource = $resource->fresh();
+        $this->assertSame(2, MarketplaceLimits::maxVersionsFor($resource));
+
+        $this->createVersion($resource, ['version' => '1.0.0']);
+        $this->createVersion($resource, ['version' => '1.0.1']);
+
+        $this->expectException(ValidationException::class);
+
+        $this->createVersion($resource, ['version' => '1.0.2']);
     }
 
     public function test_popular_resources_unlock_more_version_slots(): void
@@ -1196,7 +1227,7 @@ class MarketplaceTest extends TestCase
         $resource = $this->createResource();
         $resource->update(['downloads_count' => 1500]);
 
-        $this->assertSame(8, MarketplaceLimits::maxVersionsFor($resource->fresh()));
+        $this->assertSame(13, MarketplaceLimits::maxVersionsFor($resource->fresh()));
     }
 
     public function test_version_upload_limit_is_five_megabytes(): void
@@ -1246,6 +1277,59 @@ class MarketplaceTest extends TestCase
         ], $overrides));
     }
 
+    public function test_markdown_strips_scripts_and_unsafe_links(): void
+    {
+        $resource = $this->createResource([
+            'description' => "Hello\n\n<script>alert(1)</script>\n\n[click](javascript:alert(1))\n\n<img src=x onerror=alert(1)>",
+        ]);
+
+        $html = $resource->renderedDescription();
+
+        $this->assertStringNotContainsString('<script', $html);
+        $this->assertStringNotContainsString('onerror', $html);
+        $this->assertStringNotContainsString('javascript:', $html);
+        $this->assertStringContainsString('Hello', $html);
+        $this->assertSame($html, MarketplaceMarkdown::render($resource->description));
+    }
+
+    public function test_version_upload_rejects_a_file_that_is_not_a_zip_archive(): void
+    {
+        $resource = $this->createResource();
+
+        $this->expectException(ValidationException::class);
+
+        $this->createVersion($resource, [
+            'file' => UploadedFile::fake()->create('demo.zip', 20, 'application/zip'),
+        ]);
+    }
+
+    public function test_version_upload_rejects_zip_entries_that_escape_the_archive(): void
+    {
+        $resource = $this->createResource();
+        $path = tempnam(sys_get_temp_dir(), 'mkt');
+        $zip = new ZipArchive;
+        $zip->open($path, ZipArchive::OVERWRITE);
+        $zip->addFromString('../escape.php', '<?php');
+        $zip->close();
+
+        $this->expectException(ValidationException::class);
+
+        $this->createVersion($resource, [
+            'file' => new UploadedFile($path, 'escape.zip', 'application/zip', null, true),
+        ]);
+    }
+
+    protected function zipUpload(): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'mkt');
+        $zip = new ZipArchive;
+        $zip->open($path, ZipArchive::OVERWRITE);
+        $zip->addFromString('Module.php', "<?php\n");
+        $zip->close();
+
+        return new UploadedFile($path, 'demo.zip', 'application/zip', null, true);
+    }
+
     protected function createVersion(MarketplaceResource $resource, array $overrides = []): MarketplaceResourceVersion
     {
         return MarketplaceResourceVersion::actions()->createAsCreator(array_merge([
@@ -1258,7 +1342,7 @@ class MarketplaceTest extends TestCase
             'available_on_integrated_marketplace' => true,
             'notify_customers' => false,
             'extract_path' => 'extensions/Modules',
-            'file' => UploadedFile::fake()->create('demo.zip', 40, 'application/zip'),
+            'file' => $this->zipUpload(),
         ], $overrides));
     }
 }

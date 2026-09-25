@@ -4,7 +4,7 @@ return [
     'max_resources_per_user' => 15,
     'max_pending_resources_per_user' => 5,
     'min_account_age_days' => 3,
-    'max_versions_per_resource' => 5,
+    'max_versions_per_resource' => 10,
     'version_download_milestone' => 500,
     'max_versions_bonus_per_milestone' => 1,
     'max_versions_absolute' => 25,

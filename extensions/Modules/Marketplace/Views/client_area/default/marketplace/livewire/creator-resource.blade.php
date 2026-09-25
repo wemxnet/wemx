@@ -275,7 +275,7 @@ new class extends Component
                 </div>
                 <div>
                     <x-theme::form.label for="description" text="Description"/>
-                    <x-marketplace::markdown-composer id="edit-description" wire:model="description" :showPreview="$showPreview" :previewHtml="\Illuminate\Support\Str::markdown($description, ['html_input' => 'strip', 'allow_unsafe_links' => false])" />
+                    <x-marketplace::markdown-composer id="edit-description" wire:model="description" :showPreview="$showPreview" :previewHtml="\Extensions\Modules\Marketplace\Support\MarketplaceMarkdown::render($description)" />
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <x-theme::form.input wire:model="website_url" placeholder="Website URL"/>

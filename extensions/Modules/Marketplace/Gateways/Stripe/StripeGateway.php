@@ -32,7 +32,7 @@ class StripeGateway extends CreatorGatewayFoundation
         return [
             'secret_key' => [
                 'label' => 'Secret key',
-                'description' => 'Starts with sk_test_ or sk_live_. Stored encrypted.',
+                'description' => 'Starts with sk_test_ or sk_live_.',
                 'type' => 'password',
                 'rules' => ['required', 'string', 'starts_with:sk_'],
             ],

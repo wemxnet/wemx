@@ -65,6 +65,7 @@ return new class extends Migration
             $table->unsignedInteger('views_count')->default(0);
             $table->unsignedInteger('downloads_count')->default(0);
             $table->unsignedInteger('purchases_count')->default(0);
+            $table->unsignedInteger('version_limit')->nullable();
             $table->unsignedInteger('reviews_count')->default(0);
             $table->decimal('reviews_avg', 3, 2)->default(0);
             $table->timestamp('published_at')->nullable();
