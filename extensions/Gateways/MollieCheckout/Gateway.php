@@ -3,90 +3,74 @@
 namespace Extensions\Gateways\MollieCheckout;
 
 use App\Extensions\Foundation\GatewayExtension;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use App\Models\GatewayConfig;
 use App\Models\Payment;
 use Exception;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class Gateway extends GatewayExtension
 {
     /**
      * Define the extension identifier. This identifier should be unique.
      * For example, if the extension name is "Example Module", the extension identifier should be "module-example".
-     *
-     * @var string
      */
     protected string $id = 'gateway-mollie-checkout';
 
     /**
      * Define the extension display name
-     *
-     * @var string
      */
     protected string $name = 'Mollie Checkout';
 
     /**
      * Define the extension description.
-     *
-     * @var string
      */
     protected string $description = 'Accept payments online using Mollie Checkout.';
 
     /**
      * Define the extension type. For example, if the extension is a module, the extension type should be "Module".
-     *
-     * @var string
      */
     protected string $type = 'Gateway';
 
     /**
      * Define the gateway type. Can be "subscription" or "payment".
-     *
-     * @var string
      */
     protected string $gatewayType = 'payment';
 
     /**
      * Define the supported currencies.
-     *
-     * @var array
      */
     protected array $currencies = [];
 
+    public string $marketplace_id = '1';
+
     /**
      * Define the extension version.
-     *
-     * @var string
      */
     protected string $version = '1.0.0';
 
     /**
      * Define the WemX versions that the extension is compatible with.
      * Use * to define that the extension is compatible with all versions.
-     *
-     * @var array
      */
     protected array $wemxVersions = [
-        '1.0.0',
+        '*',
     ];
 
     /**
      * Define the authors of the extension.
-     *
-     * @var array
      */
     protected array $authors = [
         [
             'name' => 'WemX',
             'email' => 'team@wemx.net',
-        ]
+        ],
     ];
 
     /**
      * Define the extension display description to customers.
-     *
-     * @var string
      */
     public string $gatewayDescription = 'Pay easily using Mollie\'s hosted checkout page.';
 
@@ -95,21 +79,18 @@ class Gateway extends GatewayExtension
      * i.e host, api key, or other values. Use Laravel validation rules for
      *
      * Laravel validation rules: https://laravel.com/docs/10.x/validation
-     *
-     * @return array
      */
     public static function setConfig(): array
     {
         return [
             'api_key' => [
-                'label'       => 'Mollie API Key',
+                'label' => 'Mollie API Key',
                 'description' => 'Enter your Mollie API Key here.',
-                'type'        => 'text',
-                'rules'       => ['required', 'string'],
+                'type' => 'text',
+                'rules' => ['required', 'string'],
             ],
         ];
     }
-
 
     /**
      * Handle the payment process.
@@ -120,11 +101,9 @@ class Gateway extends GatewayExtension
      *
      * To retrieve config values, you can use $gatewayConfig->config('key', 'default_value').
      *
-     * @param \App\Models\Payment $payment
-     * @param \App\Models\GatewayConfig $gatewayConfig
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function pay(Payment $payment, GatewayConfig $gatewayConfig)
     {
@@ -180,7 +159,7 @@ class Gateway extends GatewayExtension
             throw new Exception('Payment record not found');
         }
 
-        if($payment->isPaid()) {
+        if ($payment->isPaid()) {
             return redirect($payment->successUrl());
         }
 
@@ -206,6 +185,7 @@ class Gateway extends GatewayExtension
         if (isset($molliePayment['status']) && $molliePayment['status'] === 'paid') {
             $payment->completed($molliePayment['id'], $molliePayment);
             $payment->logPaymentWebhook('Payment completed via callback');
+
             return redirect($payment->successUrl());
         } else {
             // You could optionally handle other statuses such as "canceled" or "expired"
@@ -222,11 +202,10 @@ class Gateway extends GatewayExtension
      *
      * Return a 200 json response to acknowledge the webhook.
      *
-     * @param \Illuminate\Http\Request $request
-     * @param \App\Models\GatewayConfig $gatwewayConfig
-     * @return \Illuminate\Http\JsonResponse
+     * @param  GatewayConfig  $gatwewayConfig
+     * @return JsonResponse
      *
-     * @throws \Exception
+     * @throws Exception
      *
      * Example response:
      * return response()->json([

@@ -2,15 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Models\Extension;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\IntegratedMarketplace;
+use App\Services\IntegratedMarketplaceInstaller;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Livewire\Volt\Volt;
+use RuntimeException;
 use Tests\TestCase;
+use ZipArchive;
 
 class IntegratedMarketplaceTest extends TestCase
 {
@@ -88,9 +93,78 @@ class IntegratedMarketplaceTest extends TestCase
             ->call('setTab', 'versions')
             ->assertSee('Initial release')
             ->assertSee('v1.0.0')
+            ->assertSee('Install 1.0.0')
             ->call('setTab', 'reviews')
             ->assertSee('Great free tool')
             ->assertSee('Works well.');
+    }
+
+    public function test_resource_page_offers_install_for_the_latest_version(): void
+    {
+        Http::fake([
+            'http://wemx.test/api/v1/marketplace/resources/demo-module' => Http::response([
+                'data' => $this->resourcePayload(),
+            ]),
+        ]);
+
+        $this->actingAsMarketplaceAdmin()
+            ->get(route('admin.marketplace.show', 'demo-module'))
+            ->assertOk()
+            ->assertSee('Install 1.0.0');
+    }
+
+    public function test_one_click_install_extracts_a_compatible_version_and_enables_it(): void
+    {
+        $zip = $this->moduleZip();
+
+        Http::fake([
+            'http://wemx.test/api/v1/marketplace/resources/one-click-demo' => Http::response([
+                'data' => $this->installableResource(hash_file('sha256', $zip)),
+            ]),
+            'http://wemx.test/api/v1/marketplace/resources/download/9' => Http::response(file_get_contents($zip), 200, [
+                'Content-Type' => 'application/zip',
+            ]),
+        ]);
+
+        $message = app(IntegratedMarketplaceInstaller::class)->install('one-click-demo', 9);
+
+        $this->assertSame('One Click Demo 1.0.0 was installed.', $message);
+        $this->assertFileExists(base_path('extensions/Modules/OneClickDemo/Module.php'));
+        $this->assertSame('enabled', Extension::query()->where('identifier', 'one-click-demo')->value('status'));
+
+        Extension::query()->where('identifier', 'one-click-demo')->delete();
+        File::deleteDirectory(base_path('extensions/Modules/OneClickDemo'));
+        @unlink($zip);
+    }
+
+    public function test_one_click_install_rejects_an_incompatible_wemx_version(): void
+    {
+        $payload = $this->installableResource(null);
+        $payload['versions'][0]['wemx_version'] = '9.9.9';
+
+        Http::fake([
+            'http://wemx.test/api/v1/marketplace/resources/one-click-demo' => Http::response(['data' => $payload]),
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('This version requires WemX 9.9.9.');
+
+        app(IntegratedMarketplaceInstaller::class)->install('one-click-demo', 9);
+    }
+
+    public function test_one_click_install_rejects_a_version_that_is_not_on_the_integrated_marketplace(): void
+    {
+        $payload = $this->installableResource(null);
+        $payload['versions'][0]['integrated_marketplace'] = false;
+
+        Http::fake([
+            'http://wemx.test/api/v1/marketplace/resources/one-click-demo' => Http::response(['data' => $payload]),
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not available on the integrated marketplace');
+
+        app(IntegratedMarketplaceInstaller::class)->install('one-click-demo', 9);
     }
 
     public function test_catalog_errors_are_not_cached(): void
@@ -173,6 +247,84 @@ class IntegratedMarketplaceTest extends TestCase
                 'user' => ['username' => 'buyer', 'avatar' => null],
             ]],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function installableResource(?string $checksum): array
+    {
+        return [
+            'name' => 'One Click Demo',
+            'slug' => 'one-click-demo',
+            'price' => 'Free',
+            'versions' => [[
+                'id' => 9,
+                'version' => '1.0.0',
+                'wemx_version' => '*',
+                'integrated_marketplace' => true,
+                'extract_path' => 'extensions/Modules',
+                'rename_extract_to' => 'OneClickDemo',
+                'checksum' => $checksum,
+            ]],
+        ];
+    }
+
+    protected function moduleZip(): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'mkt');
+        $source = tempnam(sys_get_temp_dir(), 'mod');
+        file_put_contents($source, <<<'PHP'
+<?php
+
+namespace Extensions\Modules\OneClickDemo;
+
+use App\Extensions\Foundation\ModuleExtension;
+
+class Module extends ModuleExtension
+{
+    protected string $id = 'one-click-demo';
+
+    protected string $name = 'One Click Demo';
+
+    protected string $description = 'Installed from the marketplace.';
+
+    protected string $version = '1.0.0';
+
+    protected string $marketplace_id = '9';
+
+    protected array $wemxVersions = ['*'];
+
+    public function elements(): array
+    {
+        return [];
+    }
+
+    public function onInstall(): void
+    {
+    }
+
+    public function onUninstall(): void
+    {
+    }
+
+    public function onEnable(): void
+    {
+    }
+
+    public function onDisable(): void
+    {
+    }
+}
+PHP);
+
+        $zip = new ZipArchive;
+        $zip->open($path, ZipArchive::OVERWRITE);
+        $zip->addFile($source, 'OneClickDemo/Module.php');
+        $zip->close();
+        @unlink($source);
+
+        return $path;
     }
 
     protected function actingAsMarketplaceAdmin(): self

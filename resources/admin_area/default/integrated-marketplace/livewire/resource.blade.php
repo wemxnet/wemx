@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\IntegratedMarketplace;
+use App\Services\IntegratedMarketplaceInstaller;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -14,6 +15,10 @@ new class extends Component
     #[Url(as: 'tab')]
     public string $tab = 'resource';
 
+    public ?int $installVersionId = null;
+
+    public bool $installAcknowledged = false;
+
     public function mount(): void
     {
         if (! in_array($this->tab, ['resource', 'versions', 'reviews'], true)) {
@@ -24,6 +29,34 @@ new class extends Component
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['resource', 'versions', 'reviews'], true) ? $tab : 'resource';
+    }
+
+    public function openInstall(int $versionId): void
+    {
+        $this->installVersionId = $versionId;
+        $this->installAcknowledged = false;
+    }
+
+    public function closeInstall(): void
+    {
+        $this->installVersionId = null;
+        $this->installAcknowledged = false;
+    }
+
+    public function install(): void
+    {
+        if (! $this->installAcknowledged || $this->installVersionId === null) {
+            return;
+        }
+
+        $versionId = $this->installVersionId;
+        $this->closeInstall();
+
+        try {
+            session()->flash('success', app(IntegratedMarketplaceInstaller::class)->install($this->slug, $versionId));
+        } catch (\RuntimeException $exception) {
+            session()->flash('error', $exception->getMessage());
+        }
     }
 
     /**
@@ -53,6 +86,8 @@ new class extends Component
     $versions = collect($resource['versions'] ?? []);
     $reviews = collect($resource['reviews'] ?? []);
     $latest = $versions->first();
+    $installVersion = $versions->firstWhere('id', $this->installVersionId);
+    $installCompatible = ! is_array($installVersion) || app(IntegratedMarketplaceInstaller::class)->supportsCurrentVersion((string) ($installVersion['wemx_version'] ?? ''));
 @endphp
 
 <div>
@@ -68,6 +103,14 @@ new class extends Component
         <div class="alert alert-warning" role="alert">{{ $payload['error'] }}</div>
     @endif
 
+    @if(session('success'))
+        <div class="alert alert-success" role="alert">{{ session('success') }}</div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger" role="alert">{{ session('error') }}</div>
+    @endif
+
     @if(! $resource)
         <div class="empty">
             <p class="empty-title">Resource unavailable</p>
@@ -81,7 +124,7 @@ new class extends Component
             <div class="col-lg-8">
                 <div class="card">
                     <div class="card-body">
-                        <div class="d-flex gap-3">
+                        <div class="d-flex align-items-start gap-3">
                             @include('admin::integrated-marketplace.partials.icon', ['resource' => $resource, 'size' => 64])
                             <div class="min-w-0">
                                 <div class="d-flex flex-wrap gap-1 mb-2">
@@ -92,14 +135,16 @@ new class extends Component
                                     @if(! empty($resource['featured']))
                                         <span class="badge bg-purple-lt">Featured</span>
                                     @endif
-                                    @if(! empty($resource['official']))
-                                        <span class="badge bg-azure-lt">Official</span>
-                                    @endif
                                     @if($latest)
                                         <span class="badge bg-secondary-lt">v{{ $latest['version'] }}</span>
                                     @endif
                                 </div>
-                                <h2 class="mb-1">{{ $resource['name'] }}</h2>
+                                <h2 class="mb-1 d-flex align-items-center gap-2">
+                                    <span>{{ $resource['name'] }}</span>
+                                    @if(! empty($resource['official']))
+                                        <i class="ti ti-discount-check text-azure" title="Official. This resource is from a trusted developer."></i>
+                                    @endif
+                                </h2>
                                 <div class="text-secondary">{{ $resource['short_description'] }}</div>
                                 @if(($resource['reviews_count'] ?? 0) > 0)
                                     <div class="mt-2">
@@ -135,16 +180,30 @@ new class extends Component
                                         </div>
                                         <div class="card timeline-event-card border bg-body">
                                             <div class="card-body">
-                                                <div class="d-flex flex-wrap align-items-center gap-2">
-                                                    <strong>{{ $version['name'] }}</strong>
-                                                    <span class="badge bg-secondary-lt font-monospace">v{{ $version['version'] }}</span>
-                                                    @if($index === 0)
-                                                        <span class="badge bg-blue-lt">Latest</span>
-                                                    @endif
+                                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                                        <strong>{{ $version['name'] }}</strong>
+                                                        <span class="badge bg-secondary-lt font-monospace">v{{ $version['version'] }}</span>
+                                                        @if($index === 0)
+                                                            <span class="badge bg-blue-lt">Latest</span>
+                                                        @endif
+                                                        @if(! empty($version['integrated_marketplace']))
+                                                            <span class="badge bg-green-lt">One-click install</span>
+                                                        @endif
+                                                    </div>
                                                     @if(! empty($version['integrated_marketplace']))
-                                                        <span class="badge bg-green-lt">One-click install</span>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-primary btn-sm"
+                                                            wire:click="openInstall({{ (int) $version['id'] }})"
+                                                        >
+                                                            Install {{ $version['version'] }}
+                                                        </button>
                                                     @endif
                                                 </div>
+                                                @if(! empty($version['integrated_marketplace']) && ! app(IntegratedMarketplaceInstaller::class)->supportsCurrentVersion((string) ($version['wemx_version'] ?? '')))
+                                                    <div class="alert alert-warning mt-3 mb-0" role="alert">This version requires WemX {{ $version['wemx_version'] }}. This site is running {{ config('app.version') }}.</div>
+                                                @endif
                                                 <div class="text-secondary small mt-1">
                                                     {{ $version['created_at'] ? Carbon::parse($version['created_at'])->timezone(config('app.timezone'))->format('M j, Y g:i A') : '' }}
                                                     · WemX {{ $version['wemx_version'] }}
@@ -246,12 +305,51 @@ new class extends Component
                                 @include('admin::integrated-marketplace.partials.stars', ['rating' => $resource['reviews_avg'], 'count' => $resource['reviews_count']])
                             </div>
                         @endif
+                        @if($latest && ! empty($latest['integrated_marketplace']))
+                            <button
+                                type="button"
+                                class="btn btn-primary w-100 mb-2"
+                                wire:click="openInstall({{ (int) $latest['id'] }})"
+                            >
+                                Install {{ $latest['version'] }}
+                            </button>
+                        @endif
                         @if(! empty($resource['view_url']))
-                            <a href="{{ $resource['view_url'] }}" class="btn btn-primary w-100">View on marketplace</a>
+                            <a href="{{ $resource['view_url'] }}" class="btn btn-outline-primary w-100">View on marketplace</a>
                         @endif
                     </div>
                 </div>
             </div>
         </div>
+
+        @if(is_array($installVersion))
+            <div class="modal modal-blur show d-block" tabindex="-1" role="dialog" style="background: rgba(0, 0, 0, .4);">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Install {{ $installVersion['version'] }}</h5>
+                            <button type="button" class="btn-close" wire:click="closeInstall" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            @if(! $installCompatible)
+                                <div class="alert alert-warning" role="alert">This version requires WemX {{ $installVersion['wemx_version'] }}. This site is running {{ config('app.version') }}, so it may not work.</div>
+                            @endif
+                            <p>You are installing a resource from a third-party developer. Review the listing before adding it to this site.</p>
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" wire:model.live="installAcknowledged">
+                                <span class="form-check-label">I understand this resource is provided by a third-party developer.</span>
+                            </label>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-link link-secondary" wire:click="closeInstall">Cancel</button>
+                            <button type="button" class="btn btn-primary" wire:click="install" wire:loading.attr="disabled" @disabled(! $installAcknowledged)>
+                                <span wire:loading.remove wire:target="install">Install {{ $installVersion['version'] }}</span>
+                                <span wire:loading wire:target="install">Installing…</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
     @endif
 </div>

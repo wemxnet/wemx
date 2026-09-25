@@ -36,7 +36,7 @@
             __('messages.status'),
             __('messages.created_at'),
         ],
-        'rows' =>\App\Models\Extension::latest()->get()->map(function ($extension) {
+        'rows' =>\App\Models\Extension::latest()->whereType('module')->get()->map(function ($extension) {
             return [
                 $extension->identifier,
                 $extension->extension()->getName(),

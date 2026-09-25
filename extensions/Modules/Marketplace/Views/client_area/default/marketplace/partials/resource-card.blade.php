@@ -17,11 +17,13 @@
                     @if($resource->isFeaturedNow())
                         <span class="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-200">Featured</span>
                     @endif
-                    @if($resource->is_official)
-                        <span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-200">Official</span>
-                    @endif
                 </div>
-                <h3 class="truncate text-base font-semibold text-gray-900 group-hover:text-primary-700 dark:text-white dark:group-hover:text-primary-300">{{ $resource->name }}</h3>
+                <h3 class="flex items-center gap-1.5 text-base font-semibold text-gray-900 group-hover:text-primary-700 dark:text-white dark:group-hover:text-primary-300">
+                    <span class="truncate">{{ $resource->name }}</span>
+                    @if($resource->is_official)
+                        <x-marketplace::official-badge />
+                    @endif
+                </h3>
                 <p class="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{{ $resource->short_description }}</p>
                 @if($resource->reviews_count > 0)
                     <div class="mt-2">

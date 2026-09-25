@@ -527,6 +527,12 @@ class MarketplaceTest extends TestCase
         $this->assertFalse($names->contains('Hidden'));
         $this->assertSame('Free', $response->json('data.0.price'));
         $this->assertNotEmpty($response->json('data.0.latest_version'));
+
+        $version = $listed->versions()->first();
+
+        $this->get('/api/v1/marketplace/resources/download/'.$version->id)
+            ->assertOk()
+            ->assertHeader('content-disposition');
         $this->assertArrayNotHasKey('description', $response->json('data.0'));
         $this->assertArrayNotHasKey('versions', $response->json('data.0'));
         $this->assertSame(18, $response->json('per_page'));
@@ -1301,6 +1307,173 @@ class MarketplaceTest extends TestCase
         $this->createVersion($resource, [
             'file' => UploadedFile::fake()->create('demo.zip', 20, 'application/zip'),
         ]);
+    }
+
+    public function test_version_can_be_created_from_a_github_zip_link(): void
+    {
+        $resource = $this->createResource();
+        $zip = file_get_contents($this->zipUpload()->getRealPath());
+        $url = 'https://github.com/acme/demo/releases/download/v1.0.0/demo.zip';
+
+        Http::fake([
+            $url => Http::response('', 302, ['Location' => 'https://release-assets.githubusercontent.com/demo.zip']),
+            'https://release-assets.githubusercontent.com/demo.zip' => Http::response($zip, 200, ['Content-Type' => 'application/zip']),
+        ]);
+
+        $version = $this->createVersion($resource, [
+            'file' => null,
+            'archive_url' => $url,
+        ]);
+
+        $this->assertSame($url, $version->archive_url);
+        $this->assertTrue(Storage::disk('local')->exists($version->path));
+    }
+
+    public function test_version_can_be_created_from_a_gitlab_zip_link(): void
+    {
+        $resource = $this->createResource();
+        $zip = file_get_contents($this->zipUpload()->getRealPath());
+        $url = 'https://gitlab.com/acme/demo/-/archive/main/demo-main.zip';
+
+        Http::fake([
+            $url => Http::response($zip, 200, ['Content-Type' => 'application/zip']),
+        ]);
+
+        $version = $this->createVersion($resource, [
+            'file' => null,
+            'archive_url' => $url,
+        ]);
+
+        $this->assertSame($url, $version->archive_url);
+    }
+
+    public function test_version_rejects_a_zip_link_outside_github_and_gitlab(): void
+    {
+        $resource = $this->createResource();
+
+        $this->expectException(ValidationException::class);
+
+        $this->createVersion($resource, [
+            'file' => null,
+            'archive_url' => 'https://example.com/demo.zip',
+        ]);
+    }
+
+    public function test_version_rejects_a_github_page_that_is_not_a_zip_download(): void
+    {
+        $resource = $this->createResource();
+
+        $this->expectException(ValidationException::class);
+
+        $this->createVersion($resource, [
+            'file' => null,
+            'archive_url' => 'https://github.com/acme/demo',
+        ]);
+    }
+
+    public function test_version_rejects_a_zip_link_that_does_not_return_a_zip(): void
+    {
+        $resource = $this->createResource();
+        $url = 'https://github.com/acme/demo/archive/refs/tags/v1.0.0.zip';
+
+        Http::fake([
+            $url => Http::response('<html>not a zip</html>', 200, ['Content-Type' => 'text/html']),
+        ]);
+
+        $this->expectException(ValidationException::class);
+
+        $this->createVersion($resource, [
+            'file' => null,
+            'archive_url' => $url,
+        ]);
+    }
+
+    public function test_version_rejects_a_zip_link_that_redirects_to_another_host(): void
+    {
+        $resource = $this->createResource();
+        $url = 'https://github.com/acme/demo/archive/refs/tags/v1.0.0.zip';
+
+        Http::fake([
+            $url => Http::response('', 302, ['Location' => 'https://evil.example/demo.zip']),
+        ]);
+
+        $this->expectException(ValidationException::class);
+
+        $this->createVersion($resource, [
+            'file' => null,
+            'archive_url' => $url,
+        ]);
+    }
+
+    public function test_new_version_form_is_prefilled_from_the_latest_version(): void
+    {
+        $resource = $this->createResource();
+        $version = $this->createVersion($resource, [
+            'name' => 'Hotfix',
+            'version' => '1.2.3',
+            'wemx_version' => '3.0',
+            'changelog' => 'Fixed checkout.',
+            'extract_path' => 'extensions/Gateways',
+            'rename_extract_to' => 'MollieCheckout',
+            'integrated_marketplace_only' => true,
+        ]);
+        $version->update([
+            'archive_url' => 'https://github.com/acme/demo/archive/refs/tags/v1.2.3.zip',
+        ]);
+
+        $this->actingAs($this->creator);
+
+        Volt::test('client_area.default.marketplace.livewire.creator-resource-versions', ['resourceId' => $resource->id])
+            ->assertSet('version_name', 'Hotfix')
+            ->assertSet('version_number', '1.2.3')
+            ->assertSet('wemx_version', '3.0')
+            ->assertSet('changelog', 'Fixed checkout.')
+            ->assertSet('extract_path', 'extensions/Gateways')
+            ->assertSet('rename_extract_to', 'MollieCheckout')
+            ->assertSet('version_integrated', true)
+            ->assertSet('version_integrated_only', true)
+            ->assertSet('download_type', 'link')
+            ->assertSet('archive_url', 'https://github.com/acme/demo/archive/refs/tags/v1.2.3.zip')
+            ->assertSet('package', null)
+            ->assertDontSee('Zip files only');
+    }
+
+    public function test_version_form_shows_the_field_for_the_selected_download_type(): void
+    {
+        $resource = $this->createResource();
+
+        $this->actingAs($this->creator);
+
+        Volt::test('client_area.default.marketplace.livewire.creator-resource-versions', ['resourceId' => $resource->id])
+            ->assertSee('Download Type')
+            ->assertSee('Zip File')
+            ->assertSee('GitHub Source Link')
+            ->assertSee('Zip file')
+            ->assertDontSee('GitHub source link')
+            ->set('download_type', 'link')
+            ->assertSee('GitHub source link')
+            ->assertDontSee('Zip files only');
+    }
+
+    public function test_official_resources_show_a_checkmark_instead_of_a_tag(): void
+    {
+        $resource = $this->createResource(['name' => 'Trusted module']);
+        $this->createVersion($resource);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+        MarketplaceResource::actions()->setOfficialAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+            'is_official' => true,
+        ]);
+
+        $this->get($resource->fresh()->clientUrl())
+            ->assertOk()
+            ->assertSee('Official. This resource is from a trusted developer.', false)
+            ->assertDontSee('>Official</span>', false);
     }
 
     public function test_version_upload_rejects_zip_entries_that_escape_the_archive(): void

@@ -13,6 +13,7 @@ use Extensions\Modules\Marketplace\Models\MarketplaceResource;
 use Extensions\Modules\Marketplace\Models\MarketplaceResourceVersion;
 use Extensions\Modules\Marketplace\Support\MarketplaceLimits;
 use Extensions\Modules\Marketplace\Support\MarketplaceNotifier;
+use Extensions\Modules\Marketplace\Support\MarketplaceRemoteArchives;
 use Extensions\Modules\Marketplace\Support\MarketplaceUploads;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -44,7 +45,10 @@ class MarketplaceResourceVersionActions extends Action
             $availableOnIntegrated,
         );
 
-        $stored = $this->storeUpload($validated['file'], $resource);
+        $usesRemoteArchive = ! ($validated['file'] instanceof UploadedFile);
+        $stored = $usesRemoteArchive
+            ? $this->storeRemoteArchive($validated['archive_url'], $resource)
+            : $this->storeUpload($validated['file'], $resource);
 
         $notifyCustomers = (bool) ($validated['notify_customers'] ?? false);
         $status = $resource->status === ResourceStatus::Approved
@@ -63,6 +67,7 @@ class MarketplaceResourceVersionActions extends Action
                 'integrated_marketplace_only' => $availableOnIntegrated && (bool) ($validated['integrated_marketplace_only'] ?? false),
                 'extract_path' => $extractPath,
                 'rename_extract_to' => $validated['rename_extract_to'] ?? null,
+                'archive_url' => $usesRemoteArchive ? ($validated['archive_url'] ?? null) : null,
                 'disk' => 'local',
                 'path' => $stored['path'],
                 'original_name' => $stored['original_name'],
@@ -263,8 +268,36 @@ class MarketplaceResourceVersionActions extends Action
             'notify_customers' => ['sometimes', 'boolean'],
             'extract_path' => ['nullable', 'string', 'max:255'],
             'rename_extract_to' => ['nullable', 'string', 'max:120', 'regex:/^[A-Za-z0-9._\-]+$/'],
-            'file' => ['required', 'file', 'max:'.MarketplaceLimits::maxUploadKilobytes(), 'extensions:zip', 'mimes:zip'],
+            'archive_url' => ['nullable', 'required_without:file', 'url', 'max:500'],
+            'file' => ['nullable', 'required_without:archive_url', 'file', 'max:'.MarketplaceLimits::maxUploadKilobytes(), 'extensions:zip', 'mimes:zip'],
         ];
+    }
+
+    /**
+     * @return array{path: string, original_name: string, mime_type: ?string, size: int, checksum: string}
+     */
+    protected function storeRemoteArchive(string $url, MarketplaceResource $resource): array
+    {
+        $temporary = MarketplaceRemoteArchives::fetch($url);
+        $name = basename((string) parse_url($url, PHP_URL_PATH));
+
+        if (! str_ends_with(strtolower($name), '.zip')) {
+            $name = ($name !== '' ? $name : 'package').'.zip';
+        }
+
+        try {
+            $file = new UploadedFile($temporary, $name, 'application/zip', null, true);
+
+            return $this->storeUpload($file, $resource);
+        } catch (ValidationException) {
+            throw ValidationException::withMessages([
+                'archive_url' => 'The link must return a zip download.',
+            ]);
+        } finally {
+            if (is_file($temporary)) {
+                unlink($temporary);
+            }
+        }
     }
 
     /**

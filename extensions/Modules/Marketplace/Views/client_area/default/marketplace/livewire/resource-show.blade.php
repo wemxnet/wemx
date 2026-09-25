@@ -211,14 +211,16 @@ new class extends Component
                         @if($resource->isFeaturedNow())
                             <span class="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-200">Featured</span>
                         @endif
-                        @if($resource->is_official)
-                            <span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-200">Official</span>
-                        @endif
                         @if($latest)
                             <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">v{{ $latest->version }}</span>
                         @endif
                     </div>
-                    <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{{ $resource->name }}</h1>
+                    <h1 class="flex items-center gap-2 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                        <span>{{ $resource->name }}</span>
+                        @if($resource->is_official)
+                            <x-marketplace::official-badge />
+                        @endif
+                    </h1>
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $resource->short_description }}</p>
                     @if($resource->reviews_count > 0)
                         <div class="mt-3">

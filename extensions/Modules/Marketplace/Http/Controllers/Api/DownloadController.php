@@ -9,10 +9,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DownloadController extends Controller
 {
-    public function download(Request $request, MarketplaceResourceVersion $version): StreamedResponse
+    public function download(Request $request, int $version): StreamedResponse
     {
         return MarketplaceResourceVersion::actions()->downloadForIntegrated([
-            'version_id' => $version->id,
+            'version_id' => $version,
             'license_key' => $request->string('license_key')->toString() ?: null,
         ]);
     }

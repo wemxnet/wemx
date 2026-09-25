@@ -37,15 +37,49 @@ new class extends Component
 
     public $package = null;
 
+    public string $archive_url = '';
+
+    public string $download_type = 'file';
+
     public function mount(): void
     {
         abort_unless($this->resource->userCan(auth()->user(), TeamRole::Support), 403);
-        $this->extract_path = (string) ($this->resource->category?->default_extract_path ?? '');
+        $this->prefillFromLatest();
+    }
 
-        if ($this->resource->versions->isEmpty()) {
+    public function prefillFromLatest(): void
+    {
+        $latest = $this->resource->versions->first();
+
+        $this->package = null;
+
+        if ($latest === null) {
             $this->version_name = 'Initial release';
             $this->version_number = '1.0.0';
+            $this->wemx_version = '*';
+            $this->changelog = '';
+            $this->version_integrated = true;
+            $this->version_integrated_only = false;
+            $this->notify_customers = false;
+            $this->extract_path = (string) ($this->resource->category?->default_extract_path ?? '');
+            $this->rename_extract_to = '';
+            $this->archive_url = '';
+            $this->download_type = 'file';
+
+            return;
         }
+
+        $this->version_name = $latest->name;
+        $this->version_number = $latest->version;
+        $this->wemx_version = $latest->wemx_version;
+        $this->changelog = (string) ($latest->changelog ?? '');
+        $this->version_integrated = (bool) $latest->available_on_integrated_marketplace;
+        $this->version_integrated_only = (bool) $latest->integrated_marketplace_only;
+        $this->notify_customers = (bool) $latest->notify_customers;
+        $this->extract_path = (string) ($latest->extract_path ?? '');
+        $this->rename_extract_to = (string) ($latest->rename_extract_to ?? '');
+        $this->archive_url = (string) ($latest->archive_url ?? '');
+        $this->download_type = $this->archive_url !== '' ? 'link' : 'file';
     }
 
     #[Computed]
@@ -75,7 +109,8 @@ new class extends Component
             'notify_customers' => $this->notify_customers,
             'extract_path' => $this->extract_path ?: null,
             'rename_extract_to' => $this->rename_extract_to ?: null,
-            'file' => $this->package,
+            'archive_url' => $this->download_type === 'link' && trim($this->archive_url) !== '' ? trim($this->archive_url) : null,
+            'file' => $this->download_type === 'file' ? $this->package : null,
         ]);
 
         $resource = $this->resource->fresh(['category', 'versions']);
@@ -86,8 +121,8 @@ new class extends Component
             return $this->redirect($resource->clientUrl(), navigate: true);
         }
 
-        $this->reset(['version_name', 'version_number', 'changelog', 'package', 'rename_extract_to', 'notify_customers', 'version_integrated_only']);
         unset($this->resource);
+        $this->prefillFromLatest();
         session()->flash(
             'success',
             $resource->status === ResourceStatus::Approved
@@ -205,15 +240,32 @@ new class extends Component
                     @error('changelog') <x-theme::form.error :text="$message"/> @enderror
                 </div>
                 <div>
-                    <x-theme::form.label for="package" text="Zip file"/>
-                    <x-theme::form.file id="package" wire:model="package" accept=".zip,application/zip"/>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Zip files only, up to {{ $maxUploadMegabytes }} MB.</p>
-                    <div wire:loading wire:target="package" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Uploading…</div>
-                    @if($package)
-                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Selected: {{ $package->getClientOriginalName() }}</p>
-                    @endif
+                    <x-theme::form.label for="download_type" text="Download Type"/>
+                    <x-theme::form.select
+                        id="download_type"
+                        wire:model.live="download_type"
+                        :options="['file' => 'Zip File', 'link' => 'GitHub Source Link']"
+                    />
                 </div>
-                @error('file') <x-theme::form.error :text="$message"/> @enderror
+                @if($download_type === 'file')
+                    <div>
+                        <x-theme::form.label for="package" text="Zip file"/>
+                        <x-theme::form.file id="package" wire:model="package" accept=".zip,application/zip"/>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Zip files only, up to {{ $maxUploadMegabytes }} MB.</p>
+                        <div wire:loading wire:target="package" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Uploading…</div>
+                        @if($package)
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Selected: {{ $package->getClientOriginalName() }}</p>
+                        @endif
+                    </div>
+                    @error('file') <x-theme::form.error :text="$message"/> @enderror
+                @else
+                    <div>
+                        <x-theme::form.label for="archive_url" text="GitHub source link"/>
+                        <x-theme::form.input id="archive_url" wire:model="archive_url" placeholder="https://github.com/owner/repo/archive/refs/tags/v1.0.0.zip"/>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The link must be a direct zip download from GitHub or GitLab.</p>
+                    </div>
+                    @error('archive_url') <x-theme::form.error :text="$message"/> @enderror
+                @endif
                 <x-theme::form.toggle wire:model.live="version_integrated" text="Downloadable from the integrated marketplace"/>
                 @if($version_integrated)
                     <div>

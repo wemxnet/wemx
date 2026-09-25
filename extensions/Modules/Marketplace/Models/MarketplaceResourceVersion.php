@@ -29,6 +29,7 @@ class MarketplaceResourceVersion extends Model
         'integrated_marketplace_only',
         'extract_path',
         'rename_extract_to',
+        'archive_url',
         'disk',
         'path',
         'original_name',

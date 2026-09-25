@@ -101,6 +101,7 @@ return new class extends Migration
             $table->boolean('integrated_marketplace_only')->default(false);
             $table->string('extract_path')->nullable();
             $table->string('rename_extract_to')->nullable();
+            $table->string('archive_url', 500)->nullable();
             $table->string('disk')->default('local');
             $table->string('path');
             $table->string('original_name');
