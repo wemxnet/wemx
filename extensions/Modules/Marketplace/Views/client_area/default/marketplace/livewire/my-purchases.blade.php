@@ -62,7 +62,7 @@ new class extends Component
                     $latest = $resource?->latestApprovedVersion() ?? $resource?->latestVersion();
                     $downloadableVersions = $resource
                         ?->versions
-                        ->filter(fn ($version) => $version->isDownloadable($resource))
+                        ->filter(fn ($version) => $version->downloadableFromExtensionMarketplace($resource))
                         ?? collect();
                 @endphp
                 <x-theme::card wire:key="purchase-{{ $license->id }}" class="!p-4">
@@ -95,6 +95,9 @@ new class extends Component
                             <a href="{{ route('marketplace.library.purchases.show', $license) }}" wire:navigate class="block rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Purchase details</a>
                             @if($resource)
                                 <a href="{{ $resource->clientUrl() }}" wire:navigate class="block rounded-lg border border-gray-300 px-5 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">View resource</a>
+                            @endif
+                            @if($license->status === LicenseStatus::Active && $resource && $latest?->integrated_marketplace_only)
+                                <x-theme::alert.warning class="!mb-0" text="This version can only be installed through the integrated marketplace." />
                             @endif
                             @if($license->status === LicenseStatus::Active && $resource && $downloadableVersions->isNotEmpty())
                                 @if($downloadableVersions->count() === 1)

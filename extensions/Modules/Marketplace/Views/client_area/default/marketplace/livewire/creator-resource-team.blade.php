@@ -76,7 +76,7 @@ new class extends Component
         <ul class="mb-4 space-y-2 text-sm">
             @foreach($resource->teamMembers as $member)
                 <li wire:key="member-{{ $member->id }}" class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700">
-                    <span>{{ $member->user?->username }} <span class="text-gray-500">· {{ $member->role->label() }}</span></span>
+                    <span class="min-w-0 truncate text-gray-900 dark:text-white">{{ $member->user?->username }} <span class="text-gray-500 dark:text-gray-400">· {{ $member->role->label() }}</span></span>
                     @if($canTeam && $member->role !== TeamRole::Owner)
                         <button type="button" class="text-red-600 hover:underline" wire:click="removeMember({{ $member->user_id }})" wire:confirm="Remove this team member?">Remove</button>
                     @endif

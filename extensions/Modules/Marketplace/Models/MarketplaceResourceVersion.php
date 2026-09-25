@@ -26,6 +26,7 @@ class MarketplaceResourceVersion extends Model
         'wemx_version',
         'changelog',
         'available_on_integrated_marketplace',
+        'integrated_marketplace_only',
         'extract_path',
         'rename_extract_to',
         'disk',
@@ -42,6 +43,7 @@ class MarketplaceResourceVersion extends Model
     protected $attributes = [
         'wemx_version' => '*',
         'available_on_integrated_marketplace' => true,
+        'integrated_marketplace_only' => false,
         'disk' => 'local',
         'status' => 'pending',
         'notify_customers' => false,
@@ -52,6 +54,7 @@ class MarketplaceResourceVersion extends Model
     {
         return [
             'available_on_integrated_marketplace' => 'boolean',
+            'integrated_marketplace_only' => 'boolean',
             'notify_customers' => 'boolean',
             'size' => 'integer',
             'status' => VersionStatus::class,
@@ -125,6 +128,11 @@ class MarketplaceResourceVersion extends Model
         }
 
         return $this->status === VersionStatus::Approved;
+    }
+
+    public function downloadableFromExtensionMarketplace(?MarketplaceResource $resource = null): bool
+    {
+        return $this->isDownloadable($resource) && ! $this->integrated_marketplace_only;
     }
 
     public function storageDisk(): Filesystem

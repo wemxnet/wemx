@@ -261,7 +261,8 @@ new class extends Component
                                     <div class="mt-2 w-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
                                 @endif
                             </div>
-                            <div class="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                            <div class="min-w-0 flex-1">
+                            <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                     <div>
                                         <div class="flex flex-wrap items-center gap-2">
@@ -281,7 +282,7 @@ new class extends Component
                                         @if($version->available_on_integrated_marketplace)
                                             <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">One-click install</span>
                                         @endif
-                                        @if($canDownloadVersions && $version->isDownloadable($resource))
+                                        @if($canDownloadVersions && $version->downloadableFromExtensionMarketplace($resource))
                                             @auth
                                                 <x-theme::button.primary href="{{ route('marketplace.versions.download', $version) }}" class="!px-3 !py-1.5 text-xs">
                                                     Download
@@ -293,6 +294,10 @@ new class extends Component
                                     </div>
                                 </div>
                                 <div class="format format-blue dark:format-invert mt-3 max-w-none">{!! $version->renderedChangelog() !!}</div>
+                            </div>
+                            @if($version->integrated_marketplace_only)
+                                <p class="mt-2 text-sm text-yellow-600 dark:text-yellow-400">This version can only be installed through the integrated marketplace.</p>
+                            @endif
                             </div>
                         </div>
                     @empty
@@ -429,8 +434,12 @@ new class extends Component
                     <p class="mt-2 break-all font-mono text-xs text-gray-600 dark:text-gray-300">{{ $license->license_key }}</p>
                 @endif
 
+                @if($latest?->integrated_marketplace_only)
+                    <p class="mt-4 text-sm text-yellow-600 dark:text-yellow-400">This version can only be installed through the integrated marketplace.</p>
+                @endif
+
                 <div class="mt-4 space-y-2">
-                    @if($latest && ($resource->isFree() || $license || $canManage))
+                    @if($latest && $latest->downloadableFromExtensionMarketplace($resource) && ($resource->isFree() || $license || $canManage))
                         <x-theme::button.primary href="{{ route('marketplace.versions.download', $latest) }}" class="block w-full text-center">
                             Download {{ $latest->version }}
                         </x-theme::button.primary>

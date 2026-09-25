@@ -232,7 +232,7 @@ new class extends Component
                                         <div class="text-secondary small">Extract <code>{{ $version->extract_path }}</code></div>
                                     @endif
                                 </div>
-                                @if($version->isDownloadable($resource))
+                                @if($version->downloadableFromExtensionMarketplace($resource))
                                     <a href="{{ route('marketplace.versions.download', $version) }}" class="btn btn-sm btn-outline-primary">Download</a>
                                 @endif
                             </div>

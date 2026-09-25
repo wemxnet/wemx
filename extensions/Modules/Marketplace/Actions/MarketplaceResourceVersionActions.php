@@ -36,9 +36,11 @@ class MarketplaceResourceVersionActions extends Action
         MarketplaceLimits::assertAccountAgeEligible($user);
         MarketplaceLimits::assertCanCreateVersion($resource);
 
+        $availableOnIntegrated = (bool) ($validated['available_on_integrated_marketplace'] ?? true);
+
         $extractPath = $this->normalizeExtractPath(
             $validated['extract_path'] ?? $resource->category?->default_extract_path,
-            (bool) ($validated['available_on_integrated_marketplace'] ?? true),
+            $availableOnIntegrated,
         );
 
         $stored = $this->storeUpload($validated['file'], $resource);
@@ -56,7 +58,8 @@ class MarketplaceResourceVersionActions extends Action
                 'version' => $validated['version'],
                 'wemx_version' => $validated['wemx_version'] ?? '*',
                 'changelog' => $validated['changelog'] ?? null,
-                'available_on_integrated_marketplace' => $validated['available_on_integrated_marketplace'] ?? true,
+                'available_on_integrated_marketplace' => $availableOnIntegrated,
+                'integrated_marketplace_only' => $availableOnIntegrated && (bool) ($validated['integrated_marketplace_only'] ?? false),
                 'extract_path' => $extractPath,
                 'rename_extract_to' => $validated['rename_extract_to'] ?? null,
                 'disk' => 'local',
@@ -160,6 +163,12 @@ class MarketplaceResourceVersionActions extends Action
             ]);
         }
 
+        if ($version->integrated_marketplace_only) {
+            throw ValidationException::withMessages([
+                'version_id' => 'This version can only be downloaded from the integrated marketplace.',
+            ]);
+        }
+
         $license = null;
 
         if ($user && $resource->userCan($user, TeamRole::Support)) {
@@ -249,6 +258,7 @@ class MarketplaceResourceVersionActions extends Action
             'wemx_version' => ['required', 'string', 'max:40', 'regex:/^(\*|[0-9]+(\.[0-9A-Za-z\-_]+)*)$/'],
             'changelog' => ['nullable', 'string', 'max:20000'],
             'available_on_integrated_marketplace' => ['sometimes', 'boolean'],
+            'integrated_marketplace_only' => ['sometimes', 'boolean'],
             'notify_customers' => ['sometimes', 'boolean'],
             'extract_path' => ['nullable', 'string', 'max:255'],
             'rename_extract_to' => ['nullable', 'string', 'max:120', 'regex:/^[A-Za-z0-9._\-]+$/'],

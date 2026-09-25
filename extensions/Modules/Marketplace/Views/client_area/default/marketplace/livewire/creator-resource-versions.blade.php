@@ -27,6 +27,8 @@ new class extends Component
 
     public bool $version_integrated = true;
 
+    public bool $version_integrated_only = false;
+
     public bool $notify_customers = false;
 
     public string $extract_path = '';
@@ -69,6 +71,7 @@ new class extends Component
             'wemx_version' => $this->wemx_version,
             'changelog' => $this->changelog ?: null,
             'available_on_integrated_marketplace' => $this->version_integrated,
+            'integrated_marketplace_only' => $this->version_integrated && $this->version_integrated_only,
             'notify_customers' => $this->notify_customers,
             'extract_path' => $this->extract_path ?: null,
             'rename_extract_to' => $this->rename_extract_to ?: null,
@@ -83,7 +86,7 @@ new class extends Component
             return $this->redirect($resource->clientUrl(), navigate: true);
         }
 
-        $this->reset(['version_name', 'version_number', 'changelog', 'package', 'rename_extract_to', 'notify_customers']);
+        $this->reset(['version_name', 'version_number', 'changelog', 'package', 'rename_extract_to', 'notify_customers', 'version_integrated_only']);
         unset($this->resource);
         session()->flash(
             'success',
@@ -211,6 +214,10 @@ new class extends Component
                 @error('file') <x-theme::form.error :text="$message"/> @enderror
                 <x-theme::form.toggle wire:model.live="version_integrated" text="Downloadable from the integrated marketplace"/>
                 @if($version_integrated)
+                    <div>
+                        <x-theme::form.toggle wire:model="version_integrated_only" text="Integrated Marketplace Only"/>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">If this option is enabled, the resource only becomes downloadable through the integrated marketplace and cannot be downloaded from the extension marketplace.</p>
+                    </div>
                     <x-theme::form.input wire:model="extract_path" placeholder="Extract path"/>
                     <x-theme::form.input wire:model="rename_extract_to" placeholder="Rename extracted folder"/>
                 @endif

@@ -578,6 +578,53 @@ class MarketplaceTest extends TestCase
         ]);
     }
 
+    public function test_integrated_marketplace_only_blocks_extension_downloads(): void
+    {
+        $resource = $this->createResource();
+        $version = $this->createVersion($resource, ['integrated_marketplace_only' => true]);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        $version = $version->fresh();
+        $this->assertTrue($version->integrated_marketplace_only);
+        $this->assertFalse($version->downloadableFromExtensionMarketplace($resource));
+
+        try {
+            MarketplaceResourceVersion::actions()->downloadForUser([
+                'version_id' => $version->id,
+                'user_id' => $this->buyer->id,
+            ]);
+            $this->fail('Extension marketplace downloads should be blocked.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'This version can only be downloaded from the integrated marketplace.',
+                $exception->errors()['version_id'][0],
+            );
+        }
+
+        MarketplaceResourceVersion::actions()->downloadForIntegrated([
+            'version_id' => $version->id,
+        ]);
+
+        $this->assertSame(1, $version->fresh()->downloads_count);
+    }
+
+    public function test_integrated_marketplace_only_requires_integrated_downloads(): void
+    {
+        $resource = $this->createResource();
+        $version = $this->createVersion($resource, [
+            'available_on_integrated_marketplace' => false,
+            'integrated_marketplace_only' => true,
+            'extract_path' => null,
+        ]);
+
+        $this->assertFalse($version->integrated_marketplace_only);
+        $this->assertFalse($version->available_on_integrated_marketplace);
+    }
+
     public function test_extract_path_cannot_escape_the_app(): void
     {
         $resource = $this->createResource();

@@ -65,6 +65,8 @@ return new class extends Migration
             $table->unsignedInteger('views_count')->default(0);
             $table->unsignedInteger('downloads_count')->default(0);
             $table->unsignedInteger('purchases_count')->default(0);
+            $table->unsignedInteger('reviews_count')->default(0);
+            $table->decimal('reviews_avg', 3, 2)->default(0);
             $table->timestamp('published_at')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
@@ -95,6 +97,7 @@ return new class extends Migration
             $table->string('wemx_version')->default('*');
             $table->text('changelog')->nullable();
             $table->boolean('available_on_integrated_marketplace')->default(true);
+            $table->boolean('integrated_marketplace_only')->default(false);
             $table->string('extract_path')->nullable();
             $table->string('rename_extract_to')->nullable();
             $table->string('disk')->default('local');
@@ -195,10 +198,25 @@ return new class extends Migration
 
             $table->index(['resource_id', 'visitor_hash', 'created_at']);
         });
+
+        Schema::create('marketplace_resource_reviews', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('resource_id')->constrained('marketplace_resources')->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->unsignedTinyInteger('rating');
+            $table->string('title')->nullable();
+            $table->text('body');
+            $table->boolean('is_visible')->default(true);
+            $table->timestamps();
+
+            $table->unique(['resource_id', 'user_id']);
+            $table->index(['resource_id', 'is_visible', 'created_at']);
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('marketplace_resource_reviews');
         Schema::dropIfExists('marketplace_resource_views');
         Schema::dropIfExists('marketplace_downloads');
         Schema::dropIfExists('marketplace_licenses');

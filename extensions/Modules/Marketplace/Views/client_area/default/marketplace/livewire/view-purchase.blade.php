@@ -31,7 +31,7 @@ new class extends Component
     $latest = $resource?->latestApprovedVersion() ?? $resource?->latestVersion();
     $downloadableVersions = $resource
         ?->versions
-        ->filter(fn ($version) => $version->isDownloadable($resource))
+        ->filter(fn ($version) => $version->downloadableFromExtensionMarketplace($resource))
         ?? collect();
 @endphp
 
@@ -133,6 +133,10 @@ new class extends Component
             </dl>
         </x-theme::card>
     </div>
+
+    @if($license->status === LicenseStatus::Active && $resource && $latest?->integrated_marketplace_only)
+        <x-theme::alert.warning class="mt-4" text="This version can only be installed through the integrated marketplace." />
+    @endif
 
     @if($license->status === LicenseStatus::Active && $resource && $downloadableVersions->isNotEmpty())
         <x-theme::card class="mt-4 !p-5">
