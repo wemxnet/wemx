@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Invoices\InvoiceTheme;
 use App\Models\GatewayConfig;
 use App\Models\GatewayWebhookLog;
 use App\Models\Payment;
@@ -21,11 +22,9 @@ class PaymentsController extends Controller
             abort(403);
         }
 
-        $payment->load(['user', 'gatewayConfig', 'taxDetails']);
+        $theme = InvoiceTheme::default();
 
-        $pdf = Pdf::loadView('invoices::payment-invoice', [
-            'payment' => $payment,
-        ]);
+        $pdf = Pdf::loadView($theme->view(), $theme->viewData($payment));
 
         return $pdf->download('invoice-'.($payment->invoice_id ?: $payment->id).'.pdf');
     }

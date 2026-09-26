@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Helpers\EnvironmentWriter;
+use App\Invoices\InvoiceTheme;
 use App\Mail\EmailTheme;
 use App\Models\GatewayConfig;
 use App\Models\Setting;
@@ -82,6 +83,7 @@ class SettingsActions extends Action
             ],
             'invoice_id_padding' => ['required', 'integer', 'min:0'],
             'billing_from_details' => ['nullable', 'string'],
+            'invoice_theme' => ['nullable', 'string', 'max:255', Rule::in(array_keys(InvoiceTheme::all()))],
         ])->validate();
 
         Setting::store(self::omitNullValues($validatedData));

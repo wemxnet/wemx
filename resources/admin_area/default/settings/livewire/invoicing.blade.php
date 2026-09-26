@@ -1,8 +1,8 @@
 <?php
 
-use Livewire\Volt\Component;
-use Illuminate\View\View;
+use App\Invoices\InvoiceTheme;
 use App\Models\Setting;
+use Livewire\Volt\Component;
 
 new class extends Component
 {
@@ -12,11 +12,20 @@ new class extends Component
 
     public $billing_from_details;
 
+    public string $invoice_theme = 'default';
+
+    public array $invoiceThemes = [];
+
+    public $lastModifiedTimestamps;
+
     public function mount()
     {
         $this->invoice_format = settings('invoice_format', 'INV-{year}-{id}');
         $this->invoice_id_padding = settings('invoice_id_padding', 4);
         $this->billing_from_details = settings('billing_from_details', '');
+        $this->invoice_theme = InvoiceTheme::default()->slug;
+        $this->invoiceThemes = InvoiceTheme::options();
+        $this->lastModifiedTimestamps = Setting::whereIn('key', ['invoice_theme'])->pluck('updated_at', 'key');
     }
 
     public function saveChanges()
@@ -25,6 +34,7 @@ new class extends Component
             'invoice_format' => $this->invoice_format,
             'invoice_id_padding' => $this->invoice_id_padding,
             'billing_from_details' => $this->billing_from_details,
+            'invoice_theme' => $this->invoice_theme,
         ]);
 
         $this->dispatch('alert', 'success', 'Settings saved successfully.');
@@ -62,6 +72,26 @@ new class extends Component
                     </div>
                     @error('invoice_id_padding')
                         <x-admin::form.error :message="$message" />
+                    @enderror
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <h3 class="card-title">Default Invoice Theme</h3>
+                <p class="card-subtitle">
+                    The layout used for invoice PDFs. Installed invoice themes are listed here.
+                </p>
+                <div class="row g-2">
+                    <div class="col">
+                        <x-admin::form.select wire:model="invoice_theme" id="invoice_theme" value="{{ settings('invoice_theme', 'default') }}" :options="$invoiceThemes" />
+                    </div>
+                    @error('invoice_theme')
+                        <x-admin::form.error :message="$message" />
+                    @else
+                        <small class="form-hint">
+                            {{ $invoiceThemes[$invoice_theme] ?? 'Default' }}
+                            · Last modified {{ isset($lastModifiedTimestamps['invoice_theme']) ? $lastModifiedTimestamps['invoice_theme']->diffForHumans() : 'Never' }}
+                        </small>
                     @enderror
                 </div>
             </div>

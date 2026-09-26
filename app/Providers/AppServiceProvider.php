@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Extensions\ExtensionServiceProvider;
 use App\Install\InstallServiceProvider;
+use App\Invoices\InvoiceTheme;
 use App\Mail\EmailTheme;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
@@ -47,9 +48,6 @@ class AppServiceProvider extends ServiceProvider
         Number::useLocale('en');
         Number::useCurrency('USD');
 
-        // load invoices views
-        $this->loadViewsFrom(resource_path('invoices'), 'invoices');
-
         // register custom client theme
         $this->registerClientTheme();
 
@@ -58,6 +56,9 @@ class AppServiceProvider extends ServiceProvider
 
         // register installed email themes
         $this->registerEmailThemes();
+
+        // register installed invoice themes
+        $this->registerInvoiceThemes();
 
         // define @settings('key') directive
         Blade::directive('settings', function ($key, $default = null) {
@@ -102,6 +103,20 @@ class AppServiceProvider extends ServiceProvider
         $this->publishes([
             resource_path('admin_area/'.config('app.admin_theme', 'default').'/assets') => public_path('assets/adminarea/'.config('app.admin_theme', 'default')),
         ], 'admin');
+    }
+
+    /**
+     * Register every invoice theme installed under resources/invoices.
+     */
+    private function registerInvoiceThemes(): void
+    {
+        if (! is_dir(resource_path('invoices'))) {
+            throw new \RuntimeException('Invoice themes directory not found.');
+        }
+
+        foreach (InvoiceTheme::all() as $theme) {
+            $this->loadViewsFrom($theme->path, $theme->namespace());
+        }
     }
 
     /**
