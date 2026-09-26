@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MarketplaceCategory extends Model
 {
+    public const INTEGRATED_SLUGS = ['server', 'module', 'payment-gateway'];
+
     protected $table = 'marketplace_categories';
 
     protected $fillable = [
@@ -48,8 +50,18 @@ class MarketplaceCategory extends Model
         return $query->orderBy('sort_order')->orderBy('name');
     }
 
+    public function scopeIntegrated(Builder $query): Builder
+    {
+        return $query->whereIn('slug', self::INTEGRATED_SLUGS);
+    }
+
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    public function supportsIntegratedInstall(): bool
+    {
+        return in_array($this->slug, self::INTEGRATED_SLUGS, true);
     }
 }

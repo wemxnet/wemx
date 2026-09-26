@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Extension;
+use App\Models\IntegratedMarketplaceInstallation;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Artisan;
@@ -25,6 +26,7 @@ class IntegratedMarketplaceInstaller
         @unlink($zipPath);
 
         $installed = $this->enableExtension($destination);
+        $this->remember($resource, $version, $destination);
 
         return $installed
             ? sprintf('%s %s was installed.', $resource['name'] ?? 'Resource', $version['version'])
@@ -42,11 +44,14 @@ class IntegratedMarketplaceInstaller
             throw new RuntimeException('The marketplace could not be reached.');
         }
 
-        if (! $response->successful() || ! is_array($response->json('data'))) {
+        $resource = $response->json('data');
+        $category = is_array($resource) && is_array($resource['category'] ?? null) ? $resource['category'] : [];
+
+        if (! $response->successful() || ! is_array($resource) || ! in_array($category['slug'] ?? null, IntegratedMarketplace::CATEGORY_SLUGS, true)) {
             throw new RuntimeException('This resource could not be loaded from the marketplace.');
         }
 
-        return $response->json('data');
+        return $resource;
     }
 
     /**
@@ -214,18 +219,40 @@ class IntegratedMarketplaceInstaller
         return $destination;
     }
 
+    /**
+     * @param  array<string, mixed>  $resource
+     * @param  array<string, mixed>  $version
+     */
+    private function remember(array $resource, array $version, string $destination): void
+    {
+        $namespace = $this->extensionClass($destination);
+        $extension = is_string($namespace)
+            ? Extension::query()->where('namespace', $namespace)->first()
+            : null;
+        $category = is_array($resource['category'] ?? null) ? $resource['category'] : [];
+
+        IntegratedMarketplaceInstallation::query()->updateOrCreate(
+            ['resource_slug' => (string) ($resource['slug'] ?? $this->relativePath($destination))],
+            [
+                'user_id' => auth()->id(),
+                'marketplace_resource_id' => isset($resource['id']) ? (int) $resource['id'] : null,
+                'resource_name' => (string) ($resource['name'] ?? 'Resource'),
+                'category' => is_string($category['name'] ?? null) ? $category['name'] : null,
+                'version_id' => isset($version['id']) ? (int) $version['id'] : null,
+                'version' => (string) ($version['version'] ?? ''),
+                'namespace' => $namespace,
+                'identifier' => $extension?->identifier,
+                'path' => $this->relativePath($destination),
+                'installed_at' => now(),
+            ],
+        );
+    }
+
     private function enableExtension(string $destination): bool
     {
-        $relative = $this->relativePath($destination);
-        $parts = explode('/', $relative);
+        $class = $this->extensionClass($destination);
 
-        if (($parts[0] ?? '') !== 'extensions' || count($parts) < 3) {
-            return false;
-        }
-
-        $class = 'Extensions\\'.$parts[1].'\\'.$parts[2].'\\'.Str::singular($parts[1]);
-
-        if (! class_exists($class)) {
+        if (! is_string($class) || ! class_exists($class)) {
             return false;
         }
 
@@ -241,6 +268,17 @@ class IntegratedMarketplaceInstaller
         Artisan::call('extension:migrate', ['name' => $extension->identifier]);
 
         return true;
+    }
+
+    private function extensionClass(string $destination): ?string
+    {
+        $parts = explode('/', $this->relativePath($destination));
+
+        if (($parts[0] ?? '') !== 'extensions' || count($parts) < 3) {
+            return null;
+        }
+
+        return 'Extensions\\'.$parts[1].'\\'.$parts[2].'\\'.Str::singular($parts[1]);
     }
 
     private function packageRoot(string $temp): string

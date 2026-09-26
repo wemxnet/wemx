@@ -34,10 +34,23 @@ new class extends Component
         $this->page = 1;
     }
 
+    public function mount(): void
+    {
+        $this->forgetDisallowedCategory();
+    }
+
     public function setCategory(?string $slug): void
     {
         $this->category = $slug;
+        $this->forgetDisallowedCategory();
         $this->page = 1;
+    }
+
+    private function forgetDisallowedCategory(): void
+    {
+        if ($this->category !== null && ! in_array($this->category, IntegratedMarketplace::CATEGORY_SLUGS, true)) {
+            $this->category = null;
+        }
     }
 
     public function setPage(int $page): void
@@ -92,7 +105,7 @@ new class extends Component
 @endphp
 
 <div>
-    <p class="text-secondary mb-3">Browse servers, modules, gateways, and themes published on the marketplace.</p>
+    <p class="text-secondary mb-3">Browse servers, modules, and payment gateways published on the marketplace.</p>
 
     @if($catalog['error'])
         <div class="alert alert-warning" role="alert">{{ $catalog['error'] }}</div>

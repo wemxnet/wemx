@@ -33,12 +33,13 @@ class MarketplaceResourceVersionActions extends Action
         ])->validate();
 
         $user = $this->user((int) $validated['user_id']);
-        $resource = MarketplaceResource::findOrFail($validated['resource_id']);
+        $resource = MarketplaceResource::query()->with('category')->findOrFail($validated['resource_id']);
         $this->assertCanManageResource($user, $resource, TeamRole::Developer);
         MarketplaceLimits::assertAccountAgeEligible($user);
         MarketplaceLimits::assertCanCreateVersion($resource);
 
-        $availableOnIntegrated = (bool) ($validated['available_on_integrated_marketplace'] ?? true);
+        $availableOnIntegrated = ($resource->category?->supportsIntegratedInstall() ?? false)
+            && (bool) ($validated['available_on_integrated_marketplace'] ?? true);
 
         $extractPath = $this->normalizeExtractPath(
             $validated['extract_path'] ?? $resource->category?->default_extract_path,
@@ -211,12 +212,13 @@ class MarketplaceResourceVersionActions extends Action
             'license_key' => ['nullable', 'string', 'max:80'],
         ])->validate();
 
-        $version = MarketplaceResourceVersion::query()->with('resource')->findOrFail($validated['version_id']);
+        $version = MarketplaceResourceVersion::query()->with('resource.category')->findOrFail($validated['version_id']);
         $resource = $version->resource;
 
         if (
             $resource->status !== ResourceStatus::Approved
             || ! $resource->available_on_integrated_marketplace
+            || ! ($resource->category?->supportsIntegratedInstall() ?? false)
             || ! $this->versionIsDownloadable($resource, $version)
             || ! $version->available_on_integrated_marketplace
         ) {

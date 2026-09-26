@@ -39,8 +39,11 @@ class CreatorController extends Controller
 
     public function resourceLicenses(MarketplaceResource $resource)
     {
+        $resource = $this->authorizeStudioAccess($resource);
+        abort_if($resource->isFree(), 404);
+
         return client_view('marketplace::marketplace.studio.resource-licenses', [
-            'resource' => $this->authorizeStudioAccess($resource),
+            'resource' => $resource,
         ]);
     }
 

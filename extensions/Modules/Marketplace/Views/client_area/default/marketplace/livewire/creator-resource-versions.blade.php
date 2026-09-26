@@ -58,7 +58,7 @@ new class extends Component
             $this->version_number = '1.0.0';
             $this->wemx_version = '*';
             $this->changelog = '';
-            $this->version_integrated = true;
+            $this->version_integrated = (bool) $this->resource->category?->supportsIntegratedInstall();
             $this->version_integrated_only = false;
             $this->notify_customers = false;
             $this->extract_path = (string) ($this->resource->category?->default_extract_path ?? '');
@@ -73,8 +73,9 @@ new class extends Component
         $this->version_number = $latest->version;
         $this->wemx_version = $latest->wemx_version;
         $this->changelog = (string) ($latest->changelog ?? '');
-        $this->version_integrated = (bool) $latest->available_on_integrated_marketplace;
-        $this->version_integrated_only = (bool) $latest->integrated_marketplace_only;
+        $this->version_integrated = (bool) $this->resource->category?->supportsIntegratedInstall()
+            && (bool) $latest->available_on_integrated_marketplace;
+        $this->version_integrated_only = $this->version_integrated && (bool) $latest->integrated_marketplace_only;
         $this->notify_customers = (bool) $latest->notify_customers;
         $this->extract_path = (string) ($latest->extract_path ?? '');
         $this->rename_extract_to = (string) ($latest->rename_extract_to ?? '');
@@ -104,7 +105,7 @@ new class extends Component
             'version' => $this->version_number,
             'wemx_version' => $this->wemx_version,
             'changelog' => $this->changelog ?: null,
-            'available_on_integrated_marketplace' => $this->version_integrated,
+            'available_on_integrated_marketplace' => $this->version_integrated && (bool) $this->resource->category?->supportsIntegratedInstall(),
             'integrated_marketplace_only' => $this->version_integrated && $this->version_integrated_only,
             'notify_customers' => $this->notify_customers,
             'extract_path' => $this->extract_path ?: null,
@@ -155,6 +156,7 @@ new class extends Component
     $maxVersions = MarketplaceLimits::maxVersionsFor($resource);
     $atVersionLimit = $versions->count() >= $maxVersions;
     $maxUploadMegabytes = number_format(MarketplaceLimits::maxUploadKilobytes() / 1024, 0);
+    $canIntegrate = (bool) $resource->category?->supportsIntegratedInstall();
 @endphp
 
 <div>
@@ -266,8 +268,12 @@ new class extends Component
                     </div>
                     @error('archive_url') <x-theme::form.error :text="$message"/> @enderror
                 @endif
-                <x-theme::form.toggle wire:model.live="version_integrated" text="Downloadable from the integrated marketplace"/>
-                @if($version_integrated)
+                @if($canIntegrate)
+                    <x-theme::form.toggle wire:model.live="version_integrated" text="Downloadable from the integrated marketplace"/>
+                @else
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Integrated marketplace downloads are available for servers, modules, and payment gateways.</p>
+                @endif
+                @if($canIntegrate && $version_integrated)
                     <div>
                         <x-theme::form.toggle wire:model="version_integrated_only" text="Integrated Marketplace Only"/>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">If this option is enabled, the resource only becomes downloadable through the integrated marketplace and cannot be downloaded from the extension marketplace.</p>

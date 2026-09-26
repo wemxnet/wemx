@@ -149,6 +149,31 @@ class MarketplaceResourceVersion extends Model
     }
 
     /**
+     * Columns required to build an integrated-marketplace version payload.
+     * File storage details stay out of this list.
+     *
+     * @return list<string>
+     */
+    public static function integratedColumns(): array
+    {
+        return [
+            'id',
+            'resource_id',
+            'name',
+            'version',
+            'wemx_version',
+            'changelog',
+            'status',
+            'available_on_integrated_marketplace',
+            'extract_path',
+            'rename_extract_to',
+            'size',
+            'checksum',
+            'created_at',
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toIntegratedArray(): array
@@ -163,7 +188,6 @@ class MarketplaceResourceVersion extends Model
             'integrated_marketplace' => $this->available_on_integrated_marketplace,
             'extract_path' => $this->extract_path,
             'rename_extract_to' => $this->rename_extract_to,
-            'size' => $this->size,
             'size_label' => $this->humanSize(),
             'checksum' => $this->checksum,
         ];

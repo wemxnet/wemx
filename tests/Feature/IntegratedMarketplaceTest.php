@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Extension;
+use App\Models\IntegratedMarketplaceInstallation;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\IntegratedMarketplace;
@@ -71,9 +72,40 @@ class IntegratedMarketplaceTest extends TestCase
         $this->assertSame('1.0.0', $cached['resources'][0]['latest_version']);
     }
 
+    public function test_catalog_hides_resources_outside_servers_modules_and_gateways(): void
+    {
+        $payload = $this->catalogPayload();
+        $theme = $this->resourcePayload();
+        $theme['name'] = 'Client theme';
+        $theme['slug'] = 'client-theme';
+        $theme['category'] = ['slug' => 'client-theme', 'name' => 'Client themes'];
+        $payload['data'][] = $theme;
+        $payload['categories'][] = ['slug' => 'client-theme', 'name' => 'Client themes'];
+        $payload['featured'][] = $theme;
+
+        Http::fake([
+            'http://wemx.test/api/v1/marketplace/resources*' => Http::response($payload),
+        ]);
+
+        $catalog = app(IntegratedMarketplace::class)->catalog(['category' => 'client-theme']);
+
+        $this->assertSame(['demo-module'], collect($catalog['resources'])->pluck('slug')->all());
+        $this->assertSame(['demo-module'], collect($catalog['featured'])->pluck('slug')->all());
+        $this->assertSame(['module'], collect($catalog['categories'])->pluck('slug')->all());
+
+        Http::fake([
+            'http://wemx.test/api/v1/marketplace/resources/client-theme' => Http::response([
+                'data' => $theme,
+            ]),
+        ]);
+
+        $this->assertNull(app(IntegratedMarketplace::class)->resource('client-theme')['resource']);
+    }
+
     public function test_admin_resource_page_has_sections_and_marketplace_link(): void
     {
         Http::fake([
+            'http://wemx.test/api/v1/marketplace/resources/demo-module/view' => Http::response(['views' => 1]),
             'http://wemx.test/api/v1/marketplace/resources/demo-module' => Http::response([
                 'data' => $this->resourcePayload(),
             ]),
@@ -87,6 +119,8 @@ class IntegratedMarketplaceTest extends TestCase
             ->assertSee('Reviews')
             ->assertSee('View on marketplace')
             ->assertSee('http://wemx.test/marketplace/module/demo-module', false);
+
+        Http::assertSent(fn ($request): bool => $request->method() === 'POST' && str_ends_with($request->url(), '/demo-module/view'));
 
         Volt::test('admin_area.default.integrated-marketplace.livewire.resource', ['slug' => 'demo-module'])
             ->assertSee('A demo resource.')
@@ -102,6 +136,7 @@ class IntegratedMarketplaceTest extends TestCase
     public function test_resource_page_offers_install_for_the_latest_version(): void
     {
         Http::fake([
+            'http://wemx.test/api/v1/marketplace/resources/demo-module/view' => Http::response(['views' => 1]),
             'http://wemx.test/api/v1/marketplace/resources/demo-module' => Http::response([
                 'data' => $this->resourcePayload(),
             ]),
@@ -126,14 +161,38 @@ class IntegratedMarketplaceTest extends TestCase
             ]),
         ]);
 
+        IntegratedMarketplaceInstallation::query()->create([
+            'resource_slug' => 'older-demo',
+            'resource_name' => 'Older Demo',
+            'version' => '0.1.0',
+            'namespace' => 'Extensions\\Modules\\OlderDemo\\Module',
+            'path' => 'extensions/Modules/OlderDemo',
+            'installed_at' => now()->subDay(),
+        ]);
+
+        $this->actingAsMarketplaceAdmin();
+
         $message = app(IntegratedMarketplaceInstaller::class)->install('one-click-demo', 9);
 
         $this->assertSame('One Click Demo 1.0.0 was installed.', $message);
         $this->assertFileExists(base_path('extensions/Modules/OneClickDemo/Module.php'));
         $this->assertSame('enabled', Extension::query()->where('identifier', 'one-click-demo')->value('status'));
+        $this->assertTrue(IntegratedMarketplaceInstallation::query()->where('resource_slug', 'one-click-demo')->first()?->isPresent());
+
+        $this->get(route('admin.marketplace.installed'))
+            ->assertOk()
+            ->assertSeeInOrder(['One Click Demo', 'Older Demo'])
+            ->assertSee('Successfully installed')
+            ->assertSee('Extensions\\Modules\\OneClickDemo\\Module', false);
 
         Extension::query()->where('identifier', 'one-click-demo')->delete();
         File::deleteDirectory(base_path('extensions/Modules/OneClickDemo'));
+
+        $this->get(route('admin.marketplace.installed'))
+            ->assertOk()
+            ->assertDontSee('Successfully installed')
+            ->assertSee('Was installed, but the namespace/extension could not be found');
+
         @unlink($zip);
     }
 
@@ -258,6 +317,7 @@ class IntegratedMarketplaceTest extends TestCase
             'name' => 'One Click Demo',
             'slug' => 'one-click-demo',
             'price' => 'Free',
+            'category' => ['slug' => 'module', 'name' => 'Modules'],
             'versions' => [[
                 'id' => 9,
                 'version' => '1.0.0',

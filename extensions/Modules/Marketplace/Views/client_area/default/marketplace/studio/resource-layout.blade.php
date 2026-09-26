@@ -52,13 +52,15 @@
                             'enabled' => (bool) $resource,
                             'icon' => 'versions',
                         ])
-                        @include('marketplace::client_area.default.marketplace.partials.studio-resource-nav-item', [
-                            'text' => 'Purchases',
-                            'active' => $activeTab === 'licenses',
-                            'href' => $resource?->studioUrl('licenses'),
-                            'enabled' => (bool) $resource,
-                            'icon' => 'licenses',
-                        ])
+                        @if($resource && ! $resource->isFree())
+                            @include('marketplace::client_area.default.marketplace.partials.studio-resource-nav-item', [
+                                'text' => 'Purchases',
+                                'active' => $activeTab === 'licenses',
+                                'href' => $resource->studioUrl('licenses'),
+                                'enabled' => true,
+                                'icon' => 'licenses',
+                            ])
+                        @endif
                         @include('marketplace::client_area.default.marketplace.partials.studio-resource-nav-item', [
                             'text' => 'Team',
                             'active' => $activeTab === 'team',

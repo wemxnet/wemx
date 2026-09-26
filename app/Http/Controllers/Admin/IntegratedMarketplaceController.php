@@ -13,6 +13,11 @@ class IntegratedMarketplaceController extends Controller
         return admin_view('integrated-marketplace.index');
     }
 
+    public function installed(): Factory|View
+    {
+        return admin_view('integrated-marketplace.installed');
+    }
+
     public function show(string $slug): Factory|View
     {
         return admin_view('integrated-marketplace.show', [

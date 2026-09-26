@@ -314,11 +314,22 @@
                 @perm('admin.integrated-marketplace')
                 <x-admin::navigation.sidebar-item
                     title="Marketplace"
-                    :href="route('admin.marketplace.index')"
-                    :active="$activePage === 'marketplace'">
+                    :active="in_array($activePage, ['marketplace', 'marketplace_installed'])"
+                    :dropdown="true"
+                    :id="'integrated-marketplace'">
                     <x-slot name="icon">
                         <x-admin::icon icon="building-store" outline/>
                     </x-slot>
+                    <x-admin::navigation.sidebar-dropdown-item
+                        title="Browse"
+                        :href="route('admin.marketplace.index')"
+                        :active="$activePage === 'marketplace'"
+                        icon="building-store"/>
+                    <x-admin::navigation.sidebar-dropdown-item
+                        title="Installed"
+                        :href="route('admin.marketplace.installed')"
+                        :active="$activePage === 'marketplace_installed'"
+                        icon="download"/>
                 </x-admin::navigation.sidebar-item>
                 @endperm
 

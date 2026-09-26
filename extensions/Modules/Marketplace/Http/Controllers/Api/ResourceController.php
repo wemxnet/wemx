@@ -13,7 +13,7 @@ class ResourceController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = MarketplaceResource::query()
-            ->with(['category', 'author', 'versions'])
+            ->forIntegratedCatalog()
             ->integrated();
 
         $sort = $request->string('sort_by')->toString() ?: 'popular';
@@ -56,7 +56,7 @@ class ResourceController extends Controller
 
         $featured = $showFeatured
             ? MarketplaceResource::query()
-                ->with(['category', 'author', 'versions'])
+                ->forIntegratedCatalog()
                 ->integrated()
                 ->featured()
                 ->popular()
@@ -69,6 +69,7 @@ class ResourceController extends Controller
         $payload = $resources->toArray();
         $payload['categories'] = MarketplaceCategory::query()
             ->visible()
+            ->integrated()
             ->ordered()
             ->get(['slug', 'name'])
             ->map(fn (MarketplaceCategory $category) => [
@@ -81,15 +82,29 @@ class ResourceController extends Controller
         return response()->json($payload);
     }
 
+    public function view(Request $request, string $slug): JsonResponse
+    {
+        $resource = MarketplaceResource::query()
+            ->integrated()
+            ->where('slug', $slug)
+            ->firstOrFail();
+
+        $visitor = $request->string('visitor')->toString();
+
+        $resource = MarketplaceResource::actions()->recordView(
+            $resource,
+            visitorHash: preg_match('/\A[a-f0-9]{64}\z/', $visitor) === 1 ? $visitor : null,
+        );
+
+        return response()->json([
+            'views' => $resource->views_count,
+        ]);
+    }
+
     public function show(string $slug): JsonResponse
     {
         $resource = MarketplaceResource::query()
-            ->with([
-                'category',
-                'author',
-                'versions',
-                'reviews' => fn ($query) => $query->visible()->with('user')->latest(),
-            ])
+            ->forIntegratedDetail()
             ->integrated()
             ->where('slug', $slug)
             ->firstOrFail();

@@ -60,6 +60,9 @@ Route::group(['prefix' => 'marketplace'], function () {
     Route::get('/', [Admin\IntegratedMarketplaceController::class, 'index'])
         ->name('marketplace.index')
         ->middleware('permission:admin.integrated-marketplace');
+    Route::get('/installed', [Admin\IntegratedMarketplaceController::class, 'installed'])
+        ->name('marketplace.installed')
+        ->middleware('permission:admin.integrated-marketplace');
     Route::get('/{slug}', [Admin\IntegratedMarketplaceController::class, 'show'])
         ->name('marketplace.show')
         ->middleware('permission:admin.integrated-marketplace')

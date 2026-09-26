@@ -528,9 +528,11 @@ class MarketplaceResourceActions extends Action
             ->delete();
     }
 
-    public function recordView(MarketplaceResource $resource, ?User $user = null): MarketplaceResource
+    public function recordView(MarketplaceResource $resource, ?User $user = null, ?string $visitorHash = null): MarketplaceResource
     {
-        $hash = MarketplaceResource::visitorHash($user);
+        $hash = is_string($visitorHash) && preg_match('/\A[a-f0-9]{64}\z/', $visitorHash) === 1
+            ? $visitorHash
+            : MarketplaceResource::visitorHash($user);
 
         $alreadyCounted = $resource->views()
             ->where('visitor_hash', $hash)

@@ -24,6 +24,8 @@ new class extends Component
         if (! in_array($this->tab, ['resource', 'versions', 'reviews'], true)) {
             $this->tab = 'resource';
         }
+
+        app(IntegratedMarketplace::class)->recordView($this->slug);
     }
 
     public function setTab(string $tab): void

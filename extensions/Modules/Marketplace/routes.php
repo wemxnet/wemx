@@ -11,6 +11,9 @@ Route::prefix('api/v1/marketplace')->middleware('throttle:60,1')->group(function
     Route::get('/resources/download/{version}', [Api\DownloadController::class, 'download'])
         ->middleware('throttle:30,1')
         ->name('api.marketplace.resources.download');
+    Route::post('/resources/{slug}/view', [Api\ResourceController::class, 'view'])
+        ->middleware('throttle:30,1')
+        ->name('api.marketplace.resources.view');
     Route::get('/resources/{slug}', [Api\ResourceController::class, 'show'])->name('api.marketplace.resources.show');
 });
 

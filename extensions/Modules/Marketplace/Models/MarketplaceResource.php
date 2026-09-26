@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -326,7 +327,9 @@ class MarketplaceResource extends Model
 
     public function scopeIntegrated(Builder $query): Builder
     {
-        return $query->listed()->where('available_on_integrated_marketplace', true);
+        return $query->listed()
+            ->where('available_on_integrated_marketplace', true)
+            ->whereHas('category', fn (Builder $category) => $category->integrated());
     }
 
     public function isFree(): bool
@@ -506,21 +509,77 @@ class MarketplaceResource extends Model
         });
     }
 
+    public function scopeForIntegratedCatalog(Builder $query): Builder
+    {
+        return $query
+            ->select($this->integratedListingColumns())
+            ->with([
+                'category:id,slug,name',
+                'author:id,username,email,avatar',
+            ])
+            ->addSelect([
+                'latest_integrated_version' => MarketplaceResourceVersion::query()
+                    ->select('version')
+                    ->whereColumn('marketplace_resource_versions.resource_id', 'marketplace_resources.id')
+                    ->where('status', '!=', VersionStatus::Rejected->value)
+                    ->latest('created_at')
+                    ->latest('id')
+                    ->limit(1),
+            ]);
+    }
+
+    public function scopeForIntegratedDetail(Builder $query): Builder
+    {
+        return $query
+            ->select($this->integratedDetailColumns())
+            ->with([
+                'category:id,slug,name',
+                'author:id,username,email,avatar',
+                'versions' => fn ($versions) => $versions
+                    ->select(MarketplaceResourceVersion::integratedColumns())
+                    ->where('status', '!=', VersionStatus::Rejected->value)
+                    ->latest('created_at')
+                    ->latest('id'),
+                'reviews' => fn ($reviews) => $reviews
+                    ->visible()
+                    ->select([
+                        'id',
+                        'resource_id',
+                        'user_id',
+                        'rating',
+                        'title',
+                        'body',
+                        'is_visible',
+                        'created_at',
+                    ])
+                    ->latest()
+                    ->with('user:id,username,email,avatar'),
+            ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function toIntegratedArray(bool $includeReviews = false, bool $summary = false): array
     {
-        $this->loadMissing(['category', 'author', 'versions']);
+        $this->loadMissing([
+            'category:id,slug,name',
+            'author:id,username,email,avatar',
+        ]);
 
-        $versions = $this->versions
-            ->when(
-                $this->status === ResourceStatus::Approved,
-                fn ($collection) => $collection->reject(fn (MarketplaceResourceVersion $version) => $version->status === VersionStatus::Rejected),
-                fn ($collection) => $collection->where('status', VersionStatus::Approved),
-            )
-            ->sortByDesc('created_at')
-            ->values();
+        if (! $summary && ! $this->relationLoaded('versions')) {
+            $this->load([
+                'versions' => fn ($versions) => $versions
+                    ->select(MarketplaceResourceVersion::integratedColumns())
+                    ->where('status', '!=', VersionStatus::Rejected->value)
+                    ->latest('created_at')
+                    ->latest('id'),
+            ]);
+        }
+
+        $versions = $this->relationLoaded('versions')
+            ? $this->publishedIntegratedVersions()
+            : collect();
 
         $payload = [
             'id' => $this->id,
@@ -537,18 +596,15 @@ class MarketplaceResource extends Model
             'purchases' => $this->purchases_count,
             'reviews_count' => $this->reviews_count,
             'reviews_avg' => (float) $this->reviews_avg,
-            'latest_version' => $versions->first()?->version,
-            'created_at' => $this->created_at?->toIso8601String(),
+            'latest_version' => $versions->first()?->version ?? $this->getAttribute('latest_integrated_version'),
             'view_url' => $this->clientUrl(),
             'category' => [
-                'id' => $this->category?->id,
                 'slug' => $this->category?->slug,
                 'name' => $this->category?->name,
             ],
             'user' => [
                 'username' => $this->author?->username,
                 'avatar' => $this->author?->getAvatarUrl(),
-                'url' => $this->author ? static::authorProfileUrl($this->author) : null,
             ],
         ];
 
@@ -566,7 +622,24 @@ class MarketplaceResource extends Model
             ->all();
 
         if ($includeReviews) {
-            $this->loadMissing(['reviews.user']);
+            if (! $this->relationLoaded('reviews')) {
+                $this->load([
+                    'reviews' => fn ($reviews) => $reviews
+                        ->visible()
+                        ->select([
+                            'id',
+                            'resource_id',
+                            'user_id',
+                            'rating',
+                            'title',
+                            'body',
+                            'is_visible',
+                            'created_at',
+                        ])
+                        ->latest()
+                        ->with('user:id,username,email,avatar'),
+                ]);
+            }
 
             $payload['reviews'] = $this->reviews
                 ->where('is_visible', true)
@@ -587,6 +660,68 @@ class MarketplaceResource extends Model
         }
 
         return $payload;
+    }
+
+    /**
+     * @return Collection<int, MarketplaceResourceVersion>
+     */
+    protected function publishedIntegratedVersions(): Collection
+    {
+        return $this->versions
+            ->when(
+                $this->status === ResourceStatus::Approved,
+                fn ($collection) => $collection->reject(fn (MarketplaceResourceVersion $version) => $version->status === VersionStatus::Rejected),
+                fn ($collection) => $collection->where('status', VersionStatus::Approved),
+            )
+            ->sortByDesc(fn (MarketplaceResourceVersion $version) => $version->created_at?->getTimestamp() ?? 0)
+            ->values();
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function integratedListingColumns(): array
+    {
+        return [
+            'id',
+            'user_id',
+            'category_id',
+            'name',
+            'slug',
+            'short_description',
+            'icon_disk',
+            'icon_path',
+            'price',
+            'currency',
+            'status',
+            'is_featured',
+            'is_official',
+            'is_disabled',
+            'featured_until',
+            'views_count',
+            'downloads_count',
+            'purchases_count',
+            'reviews_count',
+            'reviews_avg',
+            'published_at',
+            'updated_at',
+            'created_at',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function integratedDetailColumns(): array
+    {
+        return [
+            ...$this->integratedListingColumns(),
+            'description',
+            'website_url',
+            'docs_url',
+            'source_url',
+            'support_url',
+        ];
     }
 
     public static function generateSlug(string $name, ?int $ignoreId = null): string

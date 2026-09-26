@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Http;
 
 class IntegratedMarketplace
 {
+    public const CATEGORY_SLUGS = ['server', 'module', 'payment-gateway'];
+
     public const PER_PAGE = 18;
 
     public const CATALOG_CACHE_TTL_SECONDS = 600;
@@ -38,7 +40,7 @@ class IntegratedMarketplace
             'per_page' => self::PER_PAGE,
         ];
 
-        if ($query['category'] === '') {
+        if ($query['category'] === '' || ! in_array($query['category'], self::CATEGORY_SLUGS, true)) {
             unset($query['category']);
         }
 
@@ -68,6 +70,27 @@ class IntegratedMarketplace
     public function forgetResource(string $slug): void
     {
         Cache::forget('integrated-marketplace.resource.'.trim($slug));
+    }
+
+    public function recordView(string $slug): void
+    {
+        $slug = trim($slug);
+
+        if ($slug === '') {
+            return;
+        }
+
+        try {
+            $response = $this->request()->post('/api/v1/marketplace/resources/'.rawurlencode($slug).'/view', [
+                'visitor' => hash('sha256', 'integrated:'.rtrim((string) config('app.url'), '/').':'.(auth()->id() ?? 'guest')),
+            ]);
+        } catch (ConnectionException) {
+            return;
+        }
+
+        if ($response->successful()) {
+            $this->forgetResource($slug);
+        }
     }
 
     /**
@@ -139,11 +162,14 @@ class IntegratedMarketplace
 
         $resources = is_array($json['data'] ?? null) ? $json['data'] : [];
         $featured = is_array($json['featured'] ?? null) ? $json['featured'] : [];
+        $categories = is_array($json['categories'] ?? null) ? $json['categories'] : [];
 
         return [
-            'resources' => array_values(array_map($this->summary(...), $resources)),
-            'featured' => array_values(array_map($this->summary(...), $featured)),
-            'categories' => array_values(is_array($json['categories'] ?? null) ? $json['categories'] : []),
+            'resources' => array_values(array_filter(array_map($this->summary(...), $resources), $this->isIntegratedCategory(...))),
+            'featured' => array_values(array_filter(array_map($this->summary(...), $featured), $this->isIntegratedCategory(...))),
+            'categories' => array_values(array_filter($categories, function (mixed $category): bool {
+                return is_array($category) && in_array($category['slug'] ?? null, self::CATEGORY_SLUGS, true);
+            })),
             'page' => (int) ($json['current_page'] ?? 1),
             'last_page' => max(1, (int) ($json['last_page'] ?? 1)),
             'total' => (int) ($json['total'] ?? 0),
@@ -181,10 +207,28 @@ class IntegratedMarketplace
 
         $data = $response->json('data');
 
+        if (! is_array($data) || ! $this->isIntegratedCategory($data)) {
+            return [
+                'resource' => null,
+                'error' => is_array($data) ? null : 'This resource could not be loaded.',
+            ];
+        }
+
         return [
-            'resource' => is_array($data) ? $data : null,
-            'error' => is_array($data) ? null : 'This resource could not be loaded.',
+            'resource' => $data,
+            'error' => null,
         ];
+    }
+
+    private function isIntegratedCategory(mixed $resource): bool
+    {
+        if (! is_array($resource)) {
+            return false;
+        }
+
+        $category = is_array($resource['category'] ?? null) ? $resource['category'] : [];
+
+        return in_array($category['slug'] ?? null, self::CATEGORY_SLUGS, true);
     }
 
     /**
@@ -231,6 +275,14 @@ class IntegratedMarketplace
     {
         return Http::baseUrl(rtrim((string) config('services.marketplace.url'), '/'))
             ->acceptJson()
+            ->withOptions([
+                'allow_redirects' => [
+                    'strict' => true,
+                    'referer' => true,
+                    'protocols' => ['http', 'https'],
+                    'max' => 5,
+                ],
+            ])
             ->connectTimeout(3)
             ->timeout(8)
             ->retry(2, 200, function ($exception): bool {

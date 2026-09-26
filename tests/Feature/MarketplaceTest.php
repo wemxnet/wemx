@@ -87,12 +87,21 @@ class MarketplaceTest extends TestCase
             ->assertOk()
             ->assertSee('Resource')
             ->assertSee('Versions')
-            ->assertSee('Purchases')
+            ->assertDontSee('Purchases')
             ->assertSee('Team');
 
         $this->actingAs($this->creator)->get('/marketplace/studio/resources/'.$resource->slug.'/versions')->assertOk();
-        $this->actingAs($this->creator)->get('/marketplace/studio/resources/'.$resource->slug.'/licenses')->assertOk();
+        $this->actingAs($this->creator)->get('/marketplace/studio/resources/'.$resource->slug.'/licenses')->assertNotFound();
         $this->actingAs($this->creator)->get('/marketplace/studio/resources/'.$resource->slug.'/team')->assertOk();
+
+        $paid = $this->createResource(['name' => 'Paid module', 'price' => 12]);
+
+        $this->actingAs($this->creator)
+            ->get('/marketplace/studio/resources/'.$paid->slug)
+            ->assertOk()
+            ->assertSee('Purchases');
+
+        $this->actingAs($this->creator)->get('/marketplace/studio/resources/'.$paid->slug.'/licenses')->assertOk();
 
         $this->actingAs($this->buyer)->get('/marketplace/studio/resources/'.$resource->slug)->assertForbidden();
     }
@@ -533,10 +542,49 @@ class MarketplaceTest extends TestCase
         $this->get('/api/v1/marketplace/resources/download/'.$version->id)
             ->assertOk()
             ->assertHeader('content-disposition');
-        $this->assertArrayNotHasKey('description', $response->json('data.0'));
-        $this->assertArrayNotHasKey('versions', $response->json('data.0'));
+        $listing = $response->json('data.0');
+        $this->assertArrayNotHasKey('description', $listing);
+        $this->assertArrayNotHasKey('versions', $listing);
+        $this->assertSame(['username', 'avatar'], array_keys($listing['user']));
+        $this->assertSame(['slug', 'name'], array_keys($listing['category']));
+        $this->assertStringNotContainsString($this->creator->email, $response->getContent());
         $this->assertSame(18, $response->json('per_page'));
         $this->assertNotEmpty($response->json('categories'));
+        $this->assertEqualsCanonicalizing(
+            MarketplaceCategory::INTEGRATED_SLUGS,
+            collect($response->json('categories'))->pluck('slug')->all(),
+        );
+    }
+
+    public function test_integrated_api_hides_resources_that_are_not_servers_modules_or_gateways(): void
+    {
+        $theme = MarketplaceCategory::query()->where('slug', 'client-theme')->firstOrFail();
+        $resource = $this->createResource([
+            'name' => 'Client theme',
+            'category_id' => $theme->id,
+            'available_on_integrated_marketplace' => true,
+        ]);
+        $version = $this->createVersion($resource, [
+            'available_on_integrated_marketplace' => true,
+        ]);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        $this->getJson('/api/v1/marketplace/resources')
+            ->assertOk()
+            ->assertJsonMissing(['name' => 'Client theme']);
+
+        $this->getJson('/api/v1/marketplace/resources/'.$resource->slug)
+            ->assertNotFound();
+
+        $this->expectException(ValidationException::class);
+
+        MarketplaceResourceVersion::actions()->downloadForIntegrated([
+            'version_id' => $version->id,
+        ]);
     }
 
     public function test_integrated_api_show_includes_versions_and_reviews(): void
@@ -566,6 +614,50 @@ class MarketplaceTest extends TestCase
             ->assertJsonPath('data.versions.0.version', '1.0.0');
 
         $this->assertNotEmpty($response->json('data.view_url'));
+        $this->assertSame(['username', 'avatar'], array_keys($response->json('data.user')));
+        $this->assertSame(['username', 'avatar'], array_keys($response->json('data.reviews.0.user')));
+        $this->assertEqualsCanonicalizing([
+            'id',
+            'name',
+            'version',
+            'wemx_version',
+            'changelog',
+            'created_at',
+            'integrated_marketplace',
+            'extract_path',
+            'rename_extract_to',
+            'size_label',
+            'checksum',
+        ], array_keys($response->json('data.versions.0')));
+        $this->assertStringNotContainsString($this->creator->email, $response->getContent());
+        $this->assertStringNotContainsString($this->buyer->email, $response->getContent());
+    }
+
+    public function test_integrated_resource_views_are_counted_once_per_visitor_each_day(): void
+    {
+        $resource = $this->createResource(['name' => 'Viewed module']);
+        $this->createVersion($resource);
+
+        MarketplaceResource::actions()->approveAsAdmin([
+            'admin_user_id' => $this->admin->id,
+            'resource_id' => $resource->id,
+        ]);
+
+        $visitor = hash('sha256', 'integrated:https://shop.test:1');
+
+        $this->postJson('/api/v1/marketplace/resources/'.$resource->slug.'/view', [
+            'visitor' => $visitor,
+        ])->assertOk()->assertJsonPath('views', 1);
+
+        $this->postJson('/api/v1/marketplace/resources/'.$resource->slug.'/view', [
+            'visitor' => $visitor,
+        ])->assertOk()->assertJsonPath('views', 1);
+
+        $this->assertSame(1, $resource->fresh()->views_count);
+
+        $this->postJson('/api/v1/marketplace/resources/'.$resource->slug.'/view', [
+            'visitor' => hash('sha256', 'integrated:https://shop.test:2'),
+        ])->assertOk()->assertJsonPath('views', 2);
     }
 
     public function test_integrated_paid_download_requires_a_license_key(): void
@@ -618,6 +710,7 @@ class MarketplaceTest extends TestCase
         ]);
 
         $this->assertSame(1, $version->fresh()->downloads_count);
+        $this->assertSame(1, $resource->fresh()->downloads_count);
         $this->assertTrue($version->downloadableFromExtensionMarketplace($resource, $this->admin));
 
         MarketplaceResourceVersion::actions()->downloadForUser([
@@ -626,6 +719,33 @@ class MarketplaceTest extends TestCase
         ]);
 
         $this->assertSame(2, $version->fresh()->downloads_count);
+    }
+
+    public function test_integrated_downloads_are_only_available_for_servers_modules_and_gateways(): void
+    {
+        $theme = MarketplaceCategory::query()->where('slug', 'client-theme')->firstOrFail();
+        $resource = $this->createResource(['category_id' => $theme->id]);
+
+        $version = $this->createVersion($resource, [
+            'available_on_integrated_marketplace' => true,
+            'integrated_marketplace_only' => true,
+            'extract_path' => null,
+        ]);
+
+        $this->assertFalse($version->available_on_integrated_marketplace);
+        $this->assertFalse($version->integrated_marketplace_only);
+
+        $this->actingAs($this->creator);
+
+        Volt::test('client_area.default.marketplace.livewire.creator-resource-versions', ['resourceId' => $resource->id])
+            ->assertDontSee('Downloadable from the integrated marketplace')
+            ->assertSee('Integrated marketplace downloads are available for servers, modules, and payment gateways.');
+
+        $module = $this->createResource();
+
+        Volt::test('client_area.default.marketplace.livewire.creator-resource-versions', ['resourceId' => $module->id])
+            ->assertSee('Downloadable from the integrated marketplace')
+            ->assertSet('version_integrated', true);
     }
 
     public function test_integrated_marketplace_only_requires_integrated_downloads(): void
