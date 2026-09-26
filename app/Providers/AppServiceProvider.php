@@ -2,11 +2,14 @@
 
 namespace App\Providers;
 
+use App\Extensions\ExtensionServiceProvider;
+use App\Install\InstallServiceProvider;
+use App\Mail\EmailTheme;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Number;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -16,11 +19,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         // If app is not installed, add the install provider
-        if (!config('app.installed', false)) {
-            $this->app->register(\App\Install\InstallServiceProvider::class);
+        if (! config('app.installed', false)) {
+            $this->app->register(InstallServiceProvider::class);
         } else {
             // If app is installed, add the extension provider
-            $this->app->register(\App\Extensions\ExtensionServiceProvider::class);
+            $this->app->register(ExtensionServiceProvider::class);
         }
     }
 
@@ -53,8 +56,8 @@ class AppServiceProvider extends ServiceProvider
         // register custom admin theme
         $this->registerAdminTheme();
 
-        // register custom email theme
-        $this->registerEmailTheme();
+        // register installed email themes
+        $this->registerEmailThemes();
 
         // define @settings('key') directive
         Blade::directive('settings', function ($key, $default = null) {
@@ -71,15 +74,15 @@ class AppServiceProvider extends ServiceProvider
     private function registerClientTheme(): void
     {
         // check if the theme directory exists
-        if (!is_dir(resource_path('client_area/' . config('app.theme', 'default')))) {
-            throw new \RuntimeException('Client theme "' . config('app.theme', 'default') . '" not found');
+        if (! is_dir(resource_path('client_area/'.config('app.theme', 'default')))) {
+            throw new \RuntimeException('Client theme "'.config('app.theme', 'default').'" not found');
         }
 
-        $this->loadViewsFrom(resource_path('client_area/' . config('app.theme', 'default')), 'theme');
+        $this->loadViewsFrom(resource_path('client_area/'.config('app.theme', 'default')), 'theme');
 
         // php artisan vendor:publish --tag=client - Publishes the client theme assets
         $this->publishes([
-            resource_path('client_area/' . config('app.theme', 'default') . '/assets') => public_path('assets/clientarea/' . config('app.theme', 'default')),
+            resource_path('client_area/'.config('app.theme', 'default').'/assets') => public_path('assets/clientarea/'.config('app.theme', 'default')),
         ], 'client');
     }
 
@@ -89,29 +92,30 @@ class AppServiceProvider extends ServiceProvider
     private function registerAdminTheme(): void
     {
         // check if the theme directory exists
-        if (!is_dir(resource_path('admin_area/' . config('app.admin_theme', 'default')))) {
-            throw new \RuntimeException('Admin theme "' . config('app.admin_theme', 'default') . '" not found');
+        if (! is_dir(resource_path('admin_area/'.config('app.admin_theme', 'default')))) {
+            throw new \RuntimeException('Admin theme "'.config('app.admin_theme', 'default').'" not found');
         }
 
-        $this->loadViewsFrom(resource_path('admin_area/' . config('app.admin_theme', 'default')), 'admin');
+        $this->loadViewsFrom(resource_path('admin_area/'.config('app.admin_theme', 'default')), 'admin');
 
         // php artisan vendor:publish --tag=admin - Publishes the admin theme assets
         $this->publishes([
-            resource_path('admin_area/' . config('app.admin_theme', 'default') . '/assets') => public_path('assets/adminarea/' . config('app.admin_theme', 'default')),
+            resource_path('admin_area/'.config('app.admin_theme', 'default').'/assets') => public_path('assets/adminarea/'.config('app.admin_theme', 'default')),
         ], 'admin');
     }
 
     /**
-     * Register the email theme
+     * Register every email theme installed under resources/email_templates.
      */
-    private function registerEmailTheme(): void
+    private function registerEmailThemes(): void
     {
-        // check if the theme directory exists
-        if (!is_dir(resource_path('email_templates/' . config('app.email_theme', 'default')))) {
-            throw new \RuntimeException('Email theme "' . config('app.email_theme', 'default') . '" not found');
+        if (! is_dir(resource_path('email_templates'))) {
+            throw new \RuntimeException('Email themes directory not found.');
         }
 
-        $this->loadViewsFrom(resource_path('email_templates/' . config('app.email_theme', 'default')), 'email');
+        foreach (EmailTheme::all() as $theme) {
+            $this->loadViewsFrom($theme->path, $theme->namespace());
+        }
     }
 
     /**

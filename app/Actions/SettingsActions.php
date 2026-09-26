@@ -3,9 +3,11 @@
 namespace App\Actions;
 
 use App\Helpers\EnvironmentWriter;
+use App\Mail\EmailTheme;
 use App\Models\GatewayConfig;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class SettingsActions extends Action
@@ -23,6 +25,7 @@ class SettingsActions extends Action
             'language' => ['required', 'string'],
             'currency' => ['required', 'string'],
             'timezone' => ['required', 'string', 'timezone'],
+            'email_theme' => ['nullable', 'string', 'max:255', Rule::in(array_keys(EmailTheme::all()))],
         ])->validate();
 
         Setting::store(self::omitNullValues($validatedData));

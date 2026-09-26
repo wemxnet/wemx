@@ -2,10 +2,12 @@
 
 namespace App\Actions;
 
+use App\Mail\EmailTheme;
 use App\Models\Email;
 use App\Models\EmailTemplate;
 use App\Models\User;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class EmailActions extends Action
@@ -36,7 +38,7 @@ class EmailActions extends Action
             'button_text' => ['nullable', 'string', 'max:255'],
             'button_url' => ['nullable', 'required_with:button_text'],
             'attachments' => ['nullable', 'array'],
-            'theme' => ['nullable', 'string', 'max:255'],
+            'theme' => ['nullable', 'string', 'max:255', Rule::in(array_keys(EmailTheme::all()))],
             'display' => ['nullable', 'boolean'],
             'data' => ['nullable', 'array'],
         ])->validate();
@@ -49,10 +51,6 @@ class EmailActions extends Action
 
         if (! isset($validated['to'])) {
             $validated['to'] = $user->email;
-        }
-
-        if (! isset($validated['theme'])) {
-            $validated['theme'] = 'default';
         }
 
         if (! isset($validated['display'])) {
@@ -88,7 +86,7 @@ class EmailActions extends Action
             'button_text' => ['nullable', 'string', 'max:255', 'required_with:button_url'],
             'button_url' => ['nullable', 'url', 'required_with:button_text'],
             'attachments' => ['nullable', 'array'],
-            'theme' => ['nullable', 'string', 'max:255'],
+            'theme' => ['nullable', 'string', 'max:255', Rule::in(array_keys(EmailTheme::all()))],
             'display' => ['nullable', 'boolean'],
             'cooldown' => ['nullable', 'integer'],
             'data' => ['nullable', 'array'],

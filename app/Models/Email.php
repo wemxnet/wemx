@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Actions\EmailActions;
 use App\Jobs\DeliverCustomerMail;
+use App\Mail\EmailTheme;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Email extends Model
 {
@@ -44,7 +46,6 @@ class Email extends Model
 
     protected $attributes = [
         'status' => 'pending',
-        'theme' => 'default',
         'display' => true,
     ];
 
@@ -54,6 +55,10 @@ class Email extends Model
 
         static::creating(function ($email) {
             $email->from = config('mail.from.address');
+
+            if (EmailTheme::find($email->theme) === null) {
+                $email->theme = EmailTheme::default()->slug;
+            }
         });
 
         static::created(function ($email) {
@@ -81,14 +86,14 @@ class Email extends Model
         $this->update(['status' => 'failed']);
     }
 
-    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
     public static function actions(): EmailActions
     {
-        return new EmailActions();
+        return new EmailActions;
     }
 
     public function scopeSearch($query, $search)

@@ -12,10 +12,10 @@ alwaysApply: false
 | --- | --- | --- | --- |
 | Client | `resources/client_area/{theme}/` | `theme::` | `client_view()`, `client_view_path()` |
 | Admin | `resources/admin_area/{admin_theme}/` | `admin::` | `admin_view()`, `admin_view_path()` |
-| Email | `resources/email_templates/{email_theme}/` | `email::` | — |
+| Email | `resources/email_templates/{slug}/` | `email-theme-{slug}::` | `App\Mail\EmailTheme` |
 | Invoices | `resources/invoices/` | `invoices::` | — |
 
-Themes come from `config/app.php` (`theme`, `admin_theme`); default folder is `default`.
+Client and admin themes come from `config/app.php` (`theme`, `admin_theme`); the default folder is `default`. Email themes are folders under `resources/email_templates`. Each folder needs `email.blade.php`. Optional `text.blade.php` replaces the plain-text part, and optional `theme.json` sets `name`, `description`, and `format` (`html` or `markdown`). HTML layouts receive `name`, `body` (HTML), `text`, `subject`, and `button`. Markdown layouts receive `name`, `body` (plain markdown), `markdownTable`, and `button`, and render through Laravel's mail layout. The default email theme is the `email_theme` application setting. Each email stores the slug it was sent with.
 
 ## Volt (preferred Livewire)
 

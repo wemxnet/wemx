@@ -1,8 +1,8 @@
 <?php
 
-use Livewire\Volt\Component;
-use Illuminate\View\View;
+use App\Mail\EmailTheme;
 use App\Models\Setting;
+use Livewire\Volt\Component;
 
 new class extends Component
 {
@@ -22,6 +22,10 @@ new class extends Component
 
     public $currency = 'USD';
 
+    public string $email_theme = 'default';
+
+    public array $emailThemes = [];
+
     public $lastModifiedTimestamps;
 
     public function mount()
@@ -31,7 +35,9 @@ new class extends Component
         $this->language = settings('language', 'en');
         $this->timezone = settings('timezone', 'UTC');
         $this->currency = settings('currency', 'USD');
-        $this->lastModifiedTimestamps = Setting::whereIn('key', ['language', 'currency'])->pluck('updated_at', 'key');
+        $this->email_theme = EmailTheme::default()->slug;
+        $this->emailThemes = EmailTheme::options();
+        $this->lastModifiedTimestamps = Setting::whereIn('key', ['language', 'currency', 'email_theme'])->pluck('updated_at', 'key');
 
         $timezones = \DateTimeZone::listIdentifiers();
         $this->timezones = array_combine($timezones, $timezones);
@@ -45,6 +51,7 @@ new class extends Component
             'language' => $this->language,
             'timezone' => $this->timezone,
             'currency' => $this->currency,
+            'email_theme' => $this->email_theme,
         ]);
 
         $this->dispatch('alert', 'success', 'Settings saved successfully.');
@@ -129,6 +136,25 @@ new class extends Component
                     @else
                         <small class="form-hint">
                             Last modified {{ isset($lastModifiedTimestamps['currency']) ? $lastModifiedTimestamps['currency']->diffForHumans() : 'Never' }}
+                        </small>
+                    @enderror
+                </div>
+            </div>
+            <div class="mb-4">
+                <h3 class="card-title">Default Email Theme</h3>
+                <p class="card-subtitle">
+                    The layout used for customer emails when a message does not choose its own theme. Installed email themes are listed here.
+                </p>
+                <div class="row g-2">
+                    <div class="col">
+                        <x-admin::form.select wire:model="email_theme" id="email_theme" value="{{ settings('email_theme', 'default') }}" :options="$emailThemes" />
+                    </div>
+                    @error('email_theme')
+                        <x-admin::form.error :message="$message" />
+                    @else
+                        <small class="form-hint">
+                            {{ $emailThemes[$email_theme] ?? 'Default' }}
+                            · Last modified {{ isset($lastModifiedTimestamps['email_theme']) ? $lastModifiedTimestamps['email_theme']->diffForHumans() : 'Never' }}
                         </small>
                     @enderror
                 </div>

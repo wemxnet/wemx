@@ -8,7 +8,9 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Markdown;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use Symfony\Component\Mime\Email as SymfonyEmail;
 
 class CustomerMail extends Mailable
@@ -67,18 +69,76 @@ class CustomerMail extends Mailable
      */
     public function content(): Content
     {
-        return new Content(
-            markdown: 'emails.email',
-            with: [
-                'name' => $this->email->user ? $this->email->user->username : null,
-                'body' => implode("\n", array_map(strval(...), $this->email->lines ?? [])),
-                'markdownTable' => self::markdownTable($this->email->table),
-                'button' => [
-                    'text' => $this->email->button_text ?? null,
-                    'url' => $this->email->button_url ?? null,
+        $theme = EmailTheme::resolve($this->email->theme);
+        $name = $this->email->user ? $this->email->user->username : null;
+        $button = [
+            'text' => $this->email->button_text ?? null,
+            'url' => $this->email->button_url ?? null,
+        ];
+
+        if ($theme->usesMarkdown()) {
+            return new Content(
+                markdown: $theme->htmlView(),
+                with: [
+                    'name' => $name,
+                    'body' => implode("\n", array_map(strval(...), $this->email->lines ?? [])),
+                    'markdownTable' => self::markdownTable($this->email->table),
+                    'button' => $button,
                 ],
+            );
+        }
+
+        $text = $this->plainText();
+
+        return new Content(
+            view: $theme->htmlView(),
+            text: $theme->textView(),
+            with: [
+                'name' => $name,
+                'body' => (string) Str::markdown($text),
+                'text' => $text,
+                'subject' => $this->email->subject,
+                'button' => $button,
             ],
         );
+    }
+
+    /**
+     * Plain-text message, including a markdown table when one was provided.
+     */
+    private function plainText(): string
+    {
+        $lines = implode("\n", array_map(strval(...), $this->email->lines ?? []));
+        $table = self::markdownTable($this->email->table);
+
+        if ($table === '') {
+            return $lines;
+        }
+
+        if ($lines === '') {
+            return $table;
+        }
+
+        return $lines."\n\n".$table;
+    }
+
+    /**
+     * Use the email theme's stylesheet and mail components when it provides them.
+     */
+    protected function markdownRenderer(): Markdown
+    {
+        $emailTheme = EmailTheme::resolve($this->email->theme);
+
+        return tap(app(Markdown::class), function (Markdown $markdown) use ($emailTheme) {
+            $paths = [];
+
+            if ($emailTheme->mailComponentsPath() !== null) {
+                $paths[] = $emailTheme->mailComponentsPath();
+            }
+
+            $markdown->loadComponentsFrom($paths);
+            $markdown->theme($emailTheme->cssView() ?? (string) config('mail.markdown.theme', 'default'));
+        });
     }
 
     /**
