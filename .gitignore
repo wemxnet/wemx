@@ -26,3 +26,12 @@ yarn-error.log
 
 # Re-allow everything inside common
 !/public/assets/common/**
+
+# Ignore extensions installed on local dev
+/extensions/Modules/Tickets
+/extensions/Servers/Proxmox
+/extensions/Servers/Pterodactyl
+/extensions/Gateways/TebexCheckout
+/extensions/Servers/Cpanel
+/extensions/Gateways/MollieCheckout
+/extensions/Modules/Downloads
