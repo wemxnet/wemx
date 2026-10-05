@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Actions\SubscriptionActions;
+use App\Events\Subscriptions\SubscriptionActivated;
+use App\Events\Subscriptions\SubscriptionCancelled;
+use App\Events\Subscriptions\SubscriptionDeactivated;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -182,6 +185,8 @@ class Subscription extends Model
 
         $this->callHandler('onSubscriptionActivated');
 
+        SubscriptionActivated::dispatch($this);
+
         // email subscription activated
         $this->emailSubscriptionActivation();
     }
@@ -198,6 +203,8 @@ class Subscription extends Model
         ]);
 
         $this->callHandler('onSubscriptionDeactivated');
+
+        SubscriptionDeactivated::dispatch($this);
 
         // email subscription inactive
         $this->emailSubscriptionInactive();
@@ -216,6 +223,8 @@ class Subscription extends Model
         ]);
 
         $this->callHandler('onSubscriptionCancelled');
+
+        SubscriptionCancelled::dispatch($this, $reason);
 
         // email subscription cancelled
         $this->emailSubscriptionCancellation();

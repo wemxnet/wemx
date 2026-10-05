@@ -3,6 +3,8 @@
 namespace App\Actions;
 
 use App\Events\Orders\OrderRenewed;
+use App\Events\Orders\OrderTransferred;
+use App\Events\Orders\OrderUpgraded;
 use App\Handlers\Subscriptions\OrderSubscriptionHandler;
 use App\Models\GatewayConfig;
 use App\Models\Order;
@@ -288,6 +290,8 @@ class OrderActions extends Action
             ]);
         }
 
+        $fromUser = $order->user;
+
         $user = User::find($validatedData['user_id']);
 
         if (! $user) {
@@ -320,6 +324,8 @@ class OrderActions extends Action
                 ],
             ]);
         }
+
+        OrderTransferred::dispatch($order->refresh(), $fromUser, $user);
 
         return $order;
     }
@@ -393,6 +399,8 @@ class OrderActions extends Action
             'action' => 'order_upgraded',
             'description' => 'Order upgraded manually by '.(auth()->check() ? auth()->user()->username : 'system').' to package price #'.$newPackagePrice->id,
         ]);
+
+        OrderUpgraded::dispatch($order, $oldPackagePrice, $newPackagePrice);
 
         return $order;
     }

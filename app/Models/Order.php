@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Actions\OrderActions;
 use App\Events;
+use App\Events\Orders\OrderRenewed;
 use App\Extensions\Foundation\ExtensionFoundation;
 use App\Jobs\Orders\OrderCreateServer;
 use App\Jobs\Orders\OrderSuspendServer;
@@ -198,6 +199,8 @@ class Order extends Model
         }
 
         $this->emailAutoBalanceRenewal();
+
+        OrderRenewed::dispatch($this, $this->period_in_days);
 
         return true;
     }

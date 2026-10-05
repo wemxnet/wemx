@@ -2,6 +2,11 @@
 
 namespace App\Actions;
 
+use App\Events\Users\UserLoggedIn;
+use App\Events\Users\UserLoginFailed;
+use App\Events\Users\UserPasswordReset;
+use App\Events\Users\UserTwoFactorDisabled;
+use App\Events\Users\UserTwoFactorEnabled;
 use App\Models\PasswordResetToken;
 use App\Models\User;
 use App\Rules\NotReservedUsername;
@@ -25,17 +30,21 @@ class AuthActions extends Action
         $authField = filter_var($validatedData['username'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
         if (Auth::attempt([$authField => $validatedData['username'], 'password' => $validatedData['password']], $validatedData['remember'] ?? false)) {
+            UserLoggedIn::dispatch(auth()->user());
+
             // notify user on their previous email address
             auth()->user()->email([
                 'identifier' => 'account.new-login',
             ]);
 
             return;
-        } else {
-            throw ValidationException::withMessages([
-                'username' => 'Email, username or password is incorrect.',
-            ]);
         }
+
+        UserLoginFailed::dispatch($validatedData['username']);
+
+        throw ValidationException::withMessages([
+            'username' => 'Email, username or password is incorrect.',
+        ]);
     }
 
     public function registerAsClient(array $input)
@@ -129,6 +138,8 @@ class AuthActions extends Action
         // delete the token
         $token->delete();
 
+        UserPasswordReset::dispatch($token->user);
+
         // notify the user
         $token->user->email([
             'identifier' => 'account.password.reset',
@@ -171,10 +182,14 @@ class AuthActions extends Action
             'identifier' => 'account.2fa.enabled',
         ]);
 
-        return $user->update([
+        $updated = $user->update([
             'tfa_enabled' => true,
             'tfa_secret' => $tfa_secret,
         ]);
+
+        UserTwoFactorEnabled::dispatch($user);
+
+        return $updated;
     }
 
     public static function disableTwoFactorAuthAsClient(array $input)
@@ -200,10 +215,14 @@ class AuthActions extends Action
 
         // if tfa_secret is null for whatever reason, disable tfa
         if (! $user->tfa_secret) {
-            return $user->update([
+            $updated = $user->update([
                 'tfa_enabled' => false,
                 'tfa_secret' => null,
             ]);
+
+            UserTwoFactorDisabled::dispatch($user);
+
+            return $updated;
         }
 
         $google2fa = new Google2FA;
@@ -219,10 +238,14 @@ class AuthActions extends Action
             'identifier' => 'account.2fa.disabled',
         ]);
 
-        return $user->update([
+        $updated = $user->update([
             'tfa_enabled' => false,
             'tfa_secret' => null,
         ]);
+
+        UserTwoFactorDisabled::dispatch($user);
+
+        return $updated;
     }
 
     public static function checkTwoFactorAuthAsClient(array $input): bool
