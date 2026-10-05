@@ -2,6 +2,10 @@
 
 namespace App\Actions;
 
+use App\Events\Users\UserBanLifted;
+use App\Events\Users\UserBanned;
+use App\Events\Users\UserPasswordChanged;
+use App\Events\Users\UserTwoFactorDisabled;
 use App\Facades\World;
 use App\Models\Email;
 use App\Models\EmailTemplate;
@@ -355,6 +359,8 @@ class UserActions extends Action
             'tfa_secret' => null,
         ]);
 
+        UserTwoFactorDisabled::dispatch($user);
+
         // Notify user of 2FA disable
         $user->email([
             'identifier' => 'account.2fa.disabled_by_admin',
@@ -544,9 +550,13 @@ class UserActions extends Action
             'identifier' => 'account.password.change.confirmed',
         ]);
 
-        return $user->update([
+        $updated = $user->update([
             'password' => Hash::make($validatedData['new_password']),
         ]);
+
+        UserPasswordChanged::dispatch($user);
+
+        return $updated;
     }
 
     public static function logoutSessionAsClient(array $input)
@@ -632,7 +642,7 @@ class UserActions extends Action
             }
         }
 
-        return UserBan::create(self::omitNullValues([
+        $ban = UserBan::create(self::omitNullValues([
             'user_id' => $user->id,
             'banned_by_id' => $admin->id,
             'reason' => $validatedData['reason'] ?? null,
@@ -640,6 +650,10 @@ class UserActions extends Action
             'is_ip_ban' => $ipBan,
             'ip_address' => $ipAddress,
         ]));
+
+        UserBanned::dispatch($user, $ban);
+
+        return $ban;
     }
 
     public static function liftBanAsAdmin(array $input): bool
@@ -666,6 +680,8 @@ class UserActions extends Action
             'lifted_at' => now(),
             'lifted_by_id' => $admin->id,
         ]);
+
+        UserBanLifted::dispatch($ban->user, $ban);
 
         return true;
     }

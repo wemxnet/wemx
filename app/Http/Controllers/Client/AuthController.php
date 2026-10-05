@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Client;
 
+use App\Events\Users\UserTwoFactorDisabled;
 use App\Http\Controllers\Controller;
 use App\Models\Email;
 use App\Models\PasswordResetToken;
@@ -150,6 +151,8 @@ class AuthController extends Controller
             'tfa_enabled' => false,
             'tfa_secret' => null,
         ]);
+
+        UserTwoFactorDisabled::dispatch($email->user);
 
         $email->user->email([
             'identifier' => 'account.2fa.disable.confirmed',

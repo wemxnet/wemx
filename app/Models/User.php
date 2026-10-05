@@ -6,6 +6,8 @@ namespace App\Models;
 use App\Actions\AuthActions;
 use App\Actions\UserActions;
 use App\Events;
+use App\Events\Users\UserBalanceCredited;
+use App\Events\Users\UserEmailVerified;
 use App\Traits\Models\HasRoles;
 use App\Traits\Models\HasSettings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -324,6 +326,25 @@ class User extends Authenticatable
             'amount' => $amount,
             'balance_before_transaction' => $currentBalance,
         ]);
+
+        if ($type === '+') {
+            UserBalanceCredited::dispatch($this, $amount, $description);
+        }
+    }
+
+    public function markEmailAsVerified(): bool
+    {
+        if ($this->hasVerifiedEmail()) {
+            return parent::markEmailAsVerified();
+        }
+
+        $verified = parent::markEmailAsVerified();
+
+        if ($verified) {
+            UserEmailVerified::dispatch($this);
+        }
+
+        return $verified;
     }
 
     public function createEmptyAddress()

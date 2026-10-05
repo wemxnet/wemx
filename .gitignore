@@ -27,11 +27,27 @@ yarn-error.log
 # Re-allow everything inside common
 !/public/assets/common/**
 
-# Ignore extensions installed on local dev
-/extensions/Modules/Tickets
-/extensions/Servers/Proxmox
-/extensions/Servers/Pterodactyl
-/extensions/Gateways/TebexCheckout
-/extensions/Servers/Cpanel
-/extensions/Gateways/MollieCheckout
-/extensions/Modules/Downloads
+# Ignore extensions installed locally. Re-allow the ones that ship with the app.
+/extensions/Gateways/*
+/extensions/Modules/*
+/extensions/Servers/*
+
+!/extensions/Modules/.gitignore
+
+!/extensions/Gateways/Balance/
+!/extensions/Gateways/Balance/**
+!/extensions/Gateways/PayPalBusiness/
+!/extensions/Gateways/PayPalBusiness/**
+!/extensions/Gateways/PayPalSimple/
+!/extensions/Gateways/PayPalSimple/**
+!/extensions/Gateways/PayPalSubscription/
+!/extensions/Gateways/PayPalSubscription/**
+!/extensions/Gateways/Sandbox/
+!/extensions/Gateways/Sandbox/**
+!/extensions/Gateways/SandboxSubscription/
+!/extensions/Gateways/SandboxSubscription/**
+!/extensions/Gateways/StripeCheckout/
+!/extensions/Gateways/StripeCheckout/**
+
+!/extensions/Servers/Universal/
+!/extensions/Servers/Universal/**
