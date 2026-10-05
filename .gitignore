@@ -35,3 +35,4 @@ yarn-error.log
 /extensions/Servers/Cpanel
 /extensions/Gateways/MollieCheckout
 /extensions/Modules/Downloads
+/extensions/Servers/DirectAdmin
