@@ -38,6 +38,7 @@ class ExtensionElement extends Model
             return [
                 'element' => $element->element,
                 'view' => $element->view,
+                'permission' => $element->permission,
                 'attributes' => $element['attributes'] ?? [], // note for self, don't use $element->attributes directly, as it will use laravels method
             ];
         })->toArray();
