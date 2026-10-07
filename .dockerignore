@@ -1,19 +1,44 @@
-# Ignore the node_modules directory
+# Dependencies (installed inside the image)
 node_modules
-
-# Ignore directories with logs and cache
-storage/logs
-storage/framework/cache
-storage/framework/sessions
-storage/framework/views
-
-# Ignore the vendor directory (PHP dependencies)
 vendor
 
-# Ignore Git
-.git
+# Local configuration and data: never bake these into an image
+.env
+.env.*
+!.env.example
+docker/wemx.env
+database/*.sqlite
+auth.json
 
-# Ignore other unnecessary files
+# Runtime files
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+storage/app/*
+bootstrap/cache/*.php
+public/hot
+public/storage
+public/build
+
+# Generated theme assets (published during the image build)
+public/assets/adminarea
+public/assets/clientarea
+
+# Git, editors and OS files
+.git
+.github
+.idea
+.vscode
+.cursor
+.claude
+.fleet
 .DS_Store
 Thumbs.db
+
+# Development-only files
+tests
+.phpunit.cache
+.phpunit.result.cache
 *.md

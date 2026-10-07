@@ -51,3 +51,6 @@ yarn-error.log
 
 !/extensions/Servers/Universal/
 !/extensions/Servers/Universal/**
+
+# Docker: local configuration with passwords
+/docker/wemx.env

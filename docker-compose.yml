@@ -1,41 +1,53 @@
+# WemX with Docker Compose
+#
+#   cp docker/wemx.env.example docker/wemx.env   # then edit passwords and APP_URL
+#   docker compose up -d --build
+#
+# Open APP_URL (default http://localhost:8080) to run the web installer.
+# Full guide: https://v3.wemx.net/docs/install-guides/docker
+
+name: wemx
+
 services:
-    wemx:
+    app:
         build:
             context: .
-            dockerfile: .docker/Dockerfile
-        container_name: ${APP_NAME:-WemX}
-        restart: always
-        tty: true
-        stdin_open: true
+            dockerfile: docker/Dockerfile
+        image: wemx:local
+        restart: unless-stopped
+        env_file:
+            - docker/wemx.env
+        ports:
+            - "${WEMX_HTTP_PORT:-8080}:80"
         volumes:
-            - ./:/app
-        environment:
-            DOMAIN: ${DOMAIN:-localhost}
-            VERSION: ${VERSION:-latest}
-            TYPE: ${TYPE}
-            APP_NAME: ${APP_NAME:-WemX}
-            APP_ENV: ${APP_ENV:-production}
-            APP_DEBUG: ${APP_DEBUG:-false}
-# If not using Traefik, comment out the ports section
-#        ports:
-#            -  ${APP_PORT:-80}:80
-#            -  ${APP_PORT_SSL:-443}:443
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.${APP_NAME:-WemX}.entrypoints=http"
-            - "traefik.http.routers.${APP_NAME:-WemX}.rule=Host(`${DOMAIN}`)"
-            - "traefik.http.middlewares.${APP_NAME:-WemX}-https-redirect.redirectscheme.scheme=https"
-            - "traefik.http.routers.${APP_NAME:-WemX}.middlewares=${APP_NAME:-WemX}-https-redirect"
-            - "traefik.http.routers.${APP_NAME:-WemX}-secure.entrypoints=https"
-            - "traefik.http.routers.${APP_NAME:-WemX}-secure.rule=Host(`${DOMAIN}`)"
-            - "traefik.http.routers.${APP_NAME:-WemX}-secure.tls=true"
-            - "traefik.http.routers.${APP_NAME:-WemX}-secure.tls.certresolver=letsencrypt"
-            - "traefik.http.routers.${APP_NAME:-WemX}-secure.service=${APP_NAME}"
-            - "traefik.http.services.${APP_NAME:-WemX}.loadbalancer.server.port=80"
-        networks:
-#           This is for Traefik. Traefik network name
-            - proxy
+            - wemx-config:/config                          # .env written by the installer (contains APP_KEY)
+            - wemx-storage:/var/www/html/storage           # logs, cache, uploaded files
+            - wemx-extensions:/var/www/html/extensions     # extensions installed from the marketplace
+            - wemx-assets:/var/www/html/public/assets      # theme assets and uploaded images
+        depends_on:
+            db:
+                condition: service_healthy
 
-networks:
-    proxy:
-        external: true
+    db:
+        image: mariadb:11.4
+        restart: unless-stopped
+        env_file:
+            - docker/wemx.env
+        command:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+        volumes:
+            - wemx-db:/var/lib/mysql
+        healthcheck:
+            test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
+
+volumes:
+    wemx-config:
+    wemx-storage:
+    wemx-extensions:
+    wemx-assets:
+    wemx-db:
