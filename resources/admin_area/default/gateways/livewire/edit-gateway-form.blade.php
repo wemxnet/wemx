@@ -21,25 +21,54 @@ new class extends Component
 
     public array $config = [];
 
+    /** Keys of password fields that already have a value saved. The values themselves never reach the browser. */
+    public array $savedSecrets = [];
+
+    /** @return array<int, string> */
+    protected function secretKeys(): array
+    {
+        return collect($this->gatewayConfig->gateway->getConfig())
+            ->filter(fn ($field) => ($field['type'] ?? 'text') === 'password')
+            ->keys()
+            ->all();
+    }
+
     public function mount($gatewayConfig)
     {
-        $gatewayConfigConfig = $gatewayConfig;
         $this->display_name = $gatewayConfig->display_name;
         $this->display_description = $gatewayConfig->display_description;
         $this->icon = $gatewayConfig->icon;
-        $this->config = $gatewayConfig->config ?? [];
+
+        // Secrets (API keys, webhook secrets…) stay on the server: the form only knows whether one is saved.
+        $config = $gatewayConfig->config ?? [];
+        foreach ($this->secretKeys() as $key) {
+            if (filled($config[$key] ?? null)) {
+                $this->savedSecrets[] = $key;
+            }
+            unset($config[$key]);
+        }
+        $this->config = $config;
         $this->is_enabled = (bool) $gatewayConfig->is_active;
         $this->is_staff_only = (bool) $gatewayConfig->is_staff_only;
     }
 
     public function updateConfig()
     {
+        // A password field left blank keeps the value that's already saved.
+        $config = $this->config;
+        $stored = $this->gatewayConfig->fresh()->config ?? [];
+        foreach ($this->secretKeys() as $key) {
+            if (blank($config[$key] ?? null) && filled($stored[$key] ?? null)) {
+                $config[$key] = $stored[$key];
+            }
+        }
+
         \App\Models\GatewayConfig::actions()->updateGatewayConfigAsAdmin([
             'gateway_id' => $this->gatewayConfig->id,
             'display_name' => $this->display_name,
             'display_description' => $this->display_description,
             'icon' => $this->icon,
-            'config' => $this->config,
+            'config' => $config,
             'is_enabled' => $this->is_enabled,
             'is_staff_only' => $this->is_staff_only,
         ]);
@@ -150,7 +179,8 @@ new class extends Component
             <div class="mb-3 row">
                 <label class="col-3 col-form-label required" for="config-{{ $key }}-input">{{ $config['label'] }}</label>
                 <div class="col">
-                    <input type="{{ $config['type'] ?? 'text' }}" value="{{ $config['default_value'] ?? '' }}" wire:model="config.{{ $key }}" class="form-control @error($key) is-invalid @enderror" aria-describedby="config-{{ $key }}-input" id="config-{{ $key }}-input" placeholder="{{ $config['placeholder'] ?? $config['label'] }}"/>
+                    @php($isSavedSecret = ($config['type'] ?? 'text') === 'password' && in_array($key, $savedSecrets, true))
+                    <input type="{{ $config['type'] ?? 'text' }}" value="{{ $config['default_value'] ?? '' }}" wire:model="config.{{ $key }}" class="form-control @error($key) is-invalid @enderror" aria-describedby="config-{{ $key }}-input" id="config-{{ $key }}-input" placeholder="{{ $isSavedSecret ? '•••••••• Saved. Leave blank to keep it, or enter a new value' : ($config['placeholder'] ?? $config['label']) }}" @if(($config['type'] ?? 'text') === 'password') autocomplete="new-password" @endif/>
                     @error($key)
                         <x-admin::form.error :message="$message" />
                     @else

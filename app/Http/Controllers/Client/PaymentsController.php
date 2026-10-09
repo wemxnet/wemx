@@ -10,6 +10,8 @@ use App\Models\Payment;
 use App\Models\Subscription;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PaymentsController extends Controller
 {
@@ -113,13 +115,15 @@ class PaymentsController extends Controller
                 'headers' => $request->headers->all(),
                 'payload' => $request->all(),
                 'is_successful' => false,
-                'message' => 'Webhook error ['.get_class($error).']: '.$error->getMessage(),
+                // the column is a VARCHAR(255); a long exception message must not break the error log itself
+                'message' => Str::limit('Webhook error ['.get_class($error).']: '.$error->getMessage(), 250),
             ]);
 
+            // Details stay in the webhook log above; callers only learn that it failed.
             return response()->json([
                 'success' => false,
                 'code' => 500,
-                'message' => $error->getMessage(),
+                'message' => 'The webhook could not be processed.',
             ], 500);
         }
     }
@@ -139,10 +143,12 @@ class PaymentsController extends Controller
 
             return $gatewayConfig->gateway->handleCallback($request, $gatewayConfig);
         } catch (\Exception $error) {
+            Log::error('Gateway callback failed', ['gateway_config_id' => $gatewayConfig->id, 'error' => $error->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'code' => 500,
-                'message' => $error->getMessage(),
+                'message' => 'The payment could not be confirmed. Please contact support if you were charged.',
             ], 500);
         }
     }
