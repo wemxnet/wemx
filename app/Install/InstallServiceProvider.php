@@ -14,6 +14,9 @@ class InstallServiceProvider extends ServiceProvider
             config([
                 'session.driver' => env('SESSION_DRIVER_INSTALL', 'file'),
                 'cache.default' => env('CACHE_STORE_INSTALL', 'file'),
+                // The default cookie name is derived from APP_NAME, which the installer
+                // changes on the settings step. Pin it so the session survives that change.
+                'session.cookie' => env('SESSION_COOKIE', 'wemx_installer_session'),
             ]);
         }
     }

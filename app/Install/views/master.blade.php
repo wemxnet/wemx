@@ -5,52 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <meta name="csrf-token" content="{{ csrf_token() }}"/>
+    <meta name="robots" content="noindex, nofollow"/>
 
-    <title>WemX | Installer</title>
+    <title>Install WemX</title>
     <link rel="icon" href="{{ asset(settings('favicon', 'images/favicon.png')) }}">
-    <!-- CSS files -->
-    <link href="{{ admin_asset('css/tabler.min.css?1692870487') }}" rel="stylesheet"/>
-    <link href="{{ admin_asset('css/tabler-flags.min.css?1692870487') }}" rel="stylesheet">
-    <link href="{{ admin_asset('css/tabler-payments.min.css?1692870487') }}" rel="stylesheet"/>
-    <link href="{{ admin_asset('css/tabler-vendors.min.css?1692870487') }}" rel="stylesheet"/>
-    <link href="{{ admin_asset('css/demo.min.css?1692870487') }}" rel="stylesheet"/>
-    <link href="{{ admin_asset('css/admin.css') }}" rel="stylesheet"/>
 
-    <!-- Tabler Core -->
-    <script src="{{ admin_asset('js/tabler.min.js?1692870487') }}" defer></script>
-    <script src="{{ admin_asset('js/demo.min.js?1692870487') }}" defer></script>
+    <script>
+        // Apply the saved (or system) theme before first paint to avoid a flash.
+        (function () {
+            var theme = null;
+            try { theme = localStorage.getItem('tablerTheme'); } catch (e) {}
+            if (!theme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                theme = 'dark';
+            }
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+        })();
+    </script>
+
+    <link href="{{ admin_asset('css/tabler.min.css?1692870487') }}" rel="stylesheet"/>
+    <link href="{{ admin_asset('css/tabler-vendors.min.css?1692870487') }}" rel="stylesheet"/>
     <link rel="stylesheet" href="{{ admin_asset('libs/tabler-icons/dist/tabler-icons.min.css') }}">
+    <script src="{{ admin_asset('js/tabler.min.js?1692870487') }}" defer></script>
+
+    @include('install::partials.styles')
 
     @livewireStyles
-    @yield('styles')
 </head>
-<body>
+<body class="wx-install">
 
-<div class="page page-center">
-    @livewire('install-wizard')
-</div>
+@livewire('install-wizard')
 
-<!-- Darkmode -->
 <script>
-    function isLoading(button) {
-        //get button original name
-        buttonName = button.innerText;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> ' + buttonName;
-        button.disabled = true;
+    function wxToggleTheme() {
+        var root = document.documentElement;
+        var next = root.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+        if (next === 'dark') {
+            root.setAttribute('data-bs-theme', 'dark');
+        } else {
+            root.removeAttribute('data-bs-theme');
+        }
+        try { localStorage.setItem('tablerTheme', next); } catch (e) {}
+    }
+
+    function wxCopy(button) {
+        var text = button.parentElement.querySelector('span').innerText.trim();
+        var done = function () {
+            var icon = button.querySelector('.ti');
+            icon.className = 'ti ti-check';
+            setTimeout(function () { icon.className = 'ti ti-copy'; }, 1500);
+        };
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done);
+            return;
+        }
+
+        // Fallback for plain-HTTP installs, where the Clipboard API is unavailable.
+        var area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(area);
     }
 </script>
 
-<script>
-    !function(e){"function"==typeof define&&define.amd?define(e):e()}((function(){"use strict";var e,t="tablerTheme",a=new Proxy(new URLSearchParams(window.location.search),{get:function(e,t){return e.get(t)}});if(a.theme)localStorage.setItem(t,a.theme),e=a.theme;else{var n=localStorage.getItem(t);e=n||"light"}"dark"===e?document.body.setAttribute("data-bs-theme",e):document.body.removeAttribute("data-bs-theme")}));
-</script>
-
-<!-- Libs JS -->
-<script src="{{ admin_asset('libs/tom-select/dist/js/tom-select.base.js') }}" defer></script>
-
-<!-- Tabler Core -->
-@yield('scripts')
-
-<!-- Livewire -->
 @livewireScripts
 @stack('scripts')
 </body>

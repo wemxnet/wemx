@@ -5,6 +5,7 @@ namespace App\Install\Livewire;
 use App\Helpers\EnvironmentWriter;
 use App\Models\Setting;
 use App\Models\User;
+use App\Rules\NotReservedUsername;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
@@ -47,7 +48,7 @@ class InstallWizard extends Component
 
     public bool $hasAdminUser = false;
 
-    public $minPhpVersion = '8.1';
+    public $minPhpVersion = '8.3';
 
     public array $requiredExtensions = [
         'openssl',
@@ -179,7 +180,65 @@ class InstallWizard extends Component
             return;
         }
 
+        if ($newStep !== 'requirements' && ! $this->areRequirementsMet()) {
+            $this->step = 'requirements';
+
+            return;
+        }
+
         $this->step = $newStep;
+    }
+
+    public function recheckRequirements(): void
+    {
+        $this->areRequirementsMet();
+    }
+
+    /**
+     * Requirement checks grouped for display in the installer.
+     */
+    public function getRequirementGroupsProperty(): array
+    {
+        $phpPassed = version_compare(PHP_VERSION, $this->minPhpVersion, '>=');
+
+        $extensions = array_map(fn (string $extension) => [
+            'label' => $extension,
+            'passed' => extension_loaded($extension),
+        ], $this->requiredExtensions);
+
+        $paths = array_map(fn (string $path) => [
+            'label' => $path,
+            'passed' => is_writable(base_path($path)),
+        ], $this->writablePaths);
+
+        return [
+            'php' => [
+                'title' => 'PHP version',
+                'items' => [[
+                    'label' => 'PHP '.$this->minPhpVersion.' or newer',
+                    'detail' => 'Running '.PHP_VERSION,
+                    'passed' => $phpPassed,
+                ]],
+            ],
+            'extensions' => [
+                'title' => 'PHP extensions',
+                'items' => $extensions,
+            ],
+            'paths' => [
+                'title' => 'Writable folders',
+                'items' => $paths,
+            ],
+        ];
+    }
+
+    public function getRequirementSummaryProperty(): array
+    {
+        $items = collect($this->requirementGroups)->pluck('items')->flatten(1);
+
+        return [
+            'passed' => $items->where('passed', true)->count(),
+            'total' => $items->count(),
+        ];
     }
 
     public function updatedDatabaseConnection(string $value): void
@@ -202,6 +261,10 @@ class InstallWizard extends Component
 
     public function updated(string $property): void
     {
+        if (in_array($property, ['first_name', 'last_name'], true)) {
+            $this->resetErrorBag($property);
+        }
+
         if (str_starts_with($property, 'database_') && $property !== 'database_test_message' && $property !== 'database_test_success') {
             $this->database_test_message = null;
             $this->database_test_success = false;
@@ -214,9 +277,10 @@ class InstallWizard extends Component
     protected function adminUserRules(): array
     {
         return [
-            'first_name' => ['required', 'string', 'min:2', 'max:100'],
-            'last_name' => ['required', 'string', 'min:2', 'max:100'],
-            'username' => ['required', 'string', 'min:3', 'max:30', 'regex:/^[a-zA-Z0-9._-]+$/', 'unique:users,username'],
+            // Kept in line with AuthActions::registerAsClient(), which creates the account.
+            'first_name' => ['required', 'alpha', 'min:3', 'max:100'],
+            'last_name' => ['required', 'alpha', 'min:3', 'max:100'],
+            'username' => ['required', 'alpha_num', 'min:5', 'max:30', 'unique:users,username', new NotReservedUsername],
             'email' => ['required', 'email:rfc,dns', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
         ];
@@ -477,6 +541,14 @@ class InstallWizard extends Component
         ]);
 
         if (! $this->licenseCheckedSuccessfully || ! $this->isLicenseActive) {
+            $this->checkLicense();
+        }
+
+        if ($this->getErrorBag()->has('license_key')) {
+            return;
+        }
+
+        if (! $this->licenseCheckedSuccessfully || ! $this->isLicenseActive) {
             $this->addError('license_key', 'Please check your license key successfully before continuing.');
 
             return;
@@ -679,9 +751,11 @@ class InstallWizard extends Component
         }
 
         if (! $this->database_test_success) {
-            $this->addError('database_connection', 'Please test your database connection successfully before continuing.');
+            $this->testDatabaseConnection();
 
-            return;
+            if (! $this->database_test_success) {
+                return;
+            }
         }
 
         if ($this->has_existing_database_tables && ! $this->confirm_migrate_existing_database) {
@@ -785,6 +859,10 @@ class InstallWizard extends Component
     {
         if ($this->step !== 'complete' and config('app.installed')) {
             $this->redirect('/');
+        }
+
+        if ($this->step !== 'requirements' && $this->step !== 'complete' && ! $this->areRequirementsMet()) {
+            $this->step = 'requirements';
         }
 
         if (in_array($this->step, ['database', 'setup', 'create_user', 'complete'], true) and ! $this->isLicenseActive) {
