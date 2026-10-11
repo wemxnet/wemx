@@ -8,13 +8,22 @@
     <div class="col-auto ms-auto d-print-none">
         <div class="btn-list">
             @perm('admin.roles.create')
+            @if(\App\Support\LicensePlanLimits::rolesEnabled())
             <x-admin::button href="{{ route('admin.roles.create') }}" wire:navigate>{{ __('messages.create') }}</x-admin::button>
+            @endif
             @endperm
         </div>
     </div>
 @endsection
 
 @section('content')
+    @unless(\App\Support\LicensePlanLimits::rolesEnabled())
+        <div class="alert alert-info" role="alert">
+            Roles &amp; permissions aren't included in your WemX plan. Upgrade to Pro or higher to create staff roles and give your team access.
+            <a href="https://wemx.net/pricing" target="_blank" rel="noopener" class="alert-link">Compare plans</a>
+        </div>
+    @endunless
+
     {{--  Roles Table  --}}
     @livewire(admin_view_path('livewire.table'), [
         'title' => 'Roles',

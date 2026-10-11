@@ -143,6 +143,12 @@
                             <span>Max Servers</span>
                             <strong>{{ $limitMaxServers }}</strong>
                         </li>
+                        @foreach($planFeatures as $feature => $included)
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span>{{ $feature }}</span>
+                                <strong class="{{ $included ? 'text-success' : 'text-secondary' }}">{{ $included ? 'Included' : 'Not included' }}</strong>
+                            </li>
+                        @endforeach
                     </ul>
                 </div>
             </div>

@@ -7,7 +7,9 @@
         <x-theme::alert.warning text="This order is currently not active, subscription cannot be setup until it's active."/>
     @endif
 
-    @if(!$order->hasActiveSubscription(true))
+    @if(!$order->hasActiveSubscription(true) && ! \App\Support\LicensePlanLimits::subscriptionsEnabled())
+        <x-theme::alert.warning text="Automatic subscription payments aren't available on this store. You can renew this order manually from its invoices."/>
+    @elseif(!$order->hasActiveSubscription(true))
     <x-theme::card class="mb-4">
         <div class="mb-4">
             <h3 class="text-xl font-bold dark:text-white">

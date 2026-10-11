@@ -18,6 +18,8 @@ class RoleActions extends Action
      */
     public static function createRoleAsAdmin(array $input)
     {
+        self::assertRolesIncluded();
+
         $actor = self::assertHasPermission('admin.roles.create');
 
         $validatedData = Validator::make($input, [
@@ -77,6 +79,8 @@ class RoleActions extends Action
      */
     public static function updateRoleAsAdmin(array $input)
     {
+        self::assertRolesIncluded();
+
         $actor = self::assertHasPermission('admin.roles.update');
 
         $validatedData = Validator::make($input, [
@@ -145,6 +149,8 @@ class RoleActions extends Action
 
     public static function assignRoleAsAdmin(array $input)
     {
+        self::assertRolesIncluded();
+
         $actor = self::assertHasPermission('admin.users.manage_roles');
 
         $validatedData = Validator::make($input, [
@@ -202,6 +208,14 @@ class RoleActions extends Action
         return RoleUser::where('role_id', $validatedData['role_id'])
             ->where('user_id', $validatedData['user_id'])
             ->delete();
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private static function assertRolesIncluded(): void
+    {
+        LicensePlanLimits::assertFeature(LicensePlanLimits::FEATURE_ROLES_PERMISSIONS, 'role_id', 'Roles & permissions aren\'t included in your WemX plan. Upgrade to Pro or higher to create staff roles.');
     }
 
     private static function assertHasPermission(string $permission): User

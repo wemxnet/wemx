@@ -24,7 +24,7 @@
         @includeIf($element['view'], ['order' => $order])
     @endforeach
 
-    @if($order->isActive() && !$order->hasActiveSubscription() && $order->isRecurring() && !$order->auto_balance_renew && \App\Models\GatewayConfig::where('type', 'subscription')->where('is_active', true)->count() > 0)
+    @if($order->isActive() && !$order->hasActiveSubscription() && $order->isRecurring() && !$order->auto_balance_renew && \App\Models\GatewayConfig::where('type', 'subscription')->where('is_active', true)->count() > 0 && \App\Support\LicensePlanLimits::subscriptionsEnabled())
         <div>
             <x-theme::alert.primary class="flex items-center justify-between">
             <span>

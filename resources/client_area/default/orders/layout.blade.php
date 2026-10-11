@@ -36,7 +36,7 @@
                                 </x-slot:icon>
                             </x-theme::navlist.item>
 
-                            @if($order->isRecurring() AND \App\Models\GatewayConfig::where('type', 'subscription')->where('is_active', true)->count() > 0)
+                            @if($order->isRecurring() AND \App\Models\GatewayConfig::where('type', 'subscription')->where('is_active', true)->count() > 0 && \App\Support\LicensePlanLimits::subscriptionsEnabled())
                             <x-theme::navlist.item wire:navigate text="Subscription" href="{{ route('orders.view.subscription', ['order' => $order->id]) }}" :active="$activeTab == 'subscription'">
                                 <x-slot:icon>
                                     <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">

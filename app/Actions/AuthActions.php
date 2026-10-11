@@ -10,6 +10,7 @@ use App\Events\Users\UserTwoFactorEnabled;
 use App\Models\PasswordResetToken;
 use App\Models\User;
 use App\Rules\NotReservedUsername;
+use App\Support\LicensePlanLimits;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -58,6 +59,8 @@ class AuthActions extends Action
             'password_confirmation' => ['required', 'string'],
             'log_user_in' => ['nullable', 'boolean'],
         ])->validate();
+
+        LicensePlanLimits::assertCanCreateUsers(1, 'email');
 
         // Hash the password before creating the user
         $validatedData['password'] = Hash::make($validatedData['password']);

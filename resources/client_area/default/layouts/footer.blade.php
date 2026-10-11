@@ -16,7 +16,9 @@
         <hr class="my-6 border-gray-200 dark:border-gray-700 sm:mx-auto lg:my-8" />
         <div class="flex flex-col gap-2 text-sm text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
             <span>© {{ now()->year }} {{ settings('app_name', 'WemX') }}. All rights reserved.</span>
-            <span>Powered by <span class="font-semibold">WemX</span> <span class="text-xs">{{ config('app.version') }}</span></span>
+            @if(\App\Support\LicensePlanLimits::showPoweredBy())
+                <span>Powered by <span class="font-semibold">WemX</span> <span class="text-xs">{{ config('app.version') }}</span></span>
+            @endif
         </div>
     </div>
 </footer>

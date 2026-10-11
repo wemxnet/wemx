@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Support\LicensePlanLimits;
 use App\Helpers\EnvironmentWriter;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -126,6 +127,12 @@ class LicenseController extends Controller
             'limitMaxOrders' => $this->humanLimit(data_get($licenseData, 'limits.max_orders_limit')),
             'limitMaxGateways' => $this->humanLimit(data_get($licenseData, 'limits.max_gateways_limit')),
             'limitMaxServers' => $this->humanLimit(data_get($licenseData, 'limits.max_servers_limit')),
+            // Read from the same plan data the limits are enforced with.
+            'planFeatures' => [
+                'Recurring subscriptions' => LicensePlanLimits::subscriptionsEnabled(),
+                'Roles & permissions' => LicensePlanLimits::rolesEnabled(),
+                'Remove "Powered by WemX"' => LicensePlanLimits::hasFeature(LicensePlanLimits::FEATURE_WHITE_LABEL),
+            ],
         ]);
     }
 

@@ -717,6 +717,12 @@ class OrderActions extends Action
 
     public static function createSubscriptionAsClient(array $input)
     {
+        LicensePlanLimits::assertFeature(
+            LicensePlanLimits::FEATURE_SUBSCRIPTIONS,
+            'order_id',
+            'Automatic subscription payments aren\'t available on this store. Please renew the order manually.'
+        );
+
         $validatedData = Validator::make($input, [
             'order_id' => ['required', 'exists:orders,id'],
             'gateway_config_id' => ['required', 'exists:gateway_configs,id'],

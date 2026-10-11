@@ -13,6 +13,7 @@ use App\Models\Session;
 use App\Models\User;
 use App\Models\UserBan;
 use App\Rules\ValidVatNumber;
+use App\Support\LicensePlanLimits;
 use Exception;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -60,6 +61,8 @@ class UserActions extends Action
             $randomPassword = Str::random(12);
             $validatedData['password'] = $randomPassword;
         }
+
+        LicensePlanLimits::assertCanCreateUsers(1, 'email');
 
         // hash the password using Hash
         $validatedData['password'] = Hash::make($validatedData['password']);
