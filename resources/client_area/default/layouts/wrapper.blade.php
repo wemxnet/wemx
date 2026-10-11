@@ -66,7 +66,7 @@
 
 <body class="min-h-screen antialiased bg-gray-50 dark:bg-gray-900 flex flex-col">
 @include('theme::layouts.header', ['activePage' => $activePage ?? ''])
-    <main class="dark:bg-gray-900 flex-1 p-4 space-y-4">
+    <main class="flex-1 space-y-4 px-3 py-4 dark:bg-gray-900 sm:p-4 lg:p-6">
         @yield('content')
     </main>
 @include('theme::layouts.footer')

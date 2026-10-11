@@ -3,8 +3,8 @@
 ])
 
 @section('container')
-    <div class="mb-4 flex items-center justify-end">
-        <x-theme::button.primary type="button" data-drawer-target="invite-order-member-drawer" data-drawer-show="invite-order-member-drawer" data-drawer-placement="right" aria-controls="invite-order-member-drawer" text="Invite Member" />
+    <div class="mb-4 flex items-center justify-stretch sm:justify-end">
+        <x-theme::button.primary class="w-full sm:w-auto" type="button" data-drawer-target="invite-order-member-drawer" data-drawer-show="invite-order-member-drawer" data-drawer-placement="right" aria-controls="invite-order-member-drawer" text="Invite Member" />
     </div>
     <div class="mb-4">
         @livewire(client_view_path('livewire.table'), [

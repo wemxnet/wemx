@@ -3,27 +3,27 @@
 @section('container')
     @if($inviteCount = \App\Models\OrderMember::where('email', auth()->user()->email)->where('status', 'pending')->count() > 0)
     <div>
-        <x-theme::alert.primary class="flex items-center justify-between">
-            <span>You have {{ $inviteCount }} pending invite(s) to orders.</span>
-            <x-theme::button.primary href="{{ route('dashboard.order-invites') }}" wire:navigate text="View Invites" />
+        <x-theme::alert.primary class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span class="min-w-0">You have {{ $inviteCount }} pending invite(s) to orders.</span>
+            <x-theme::button.primary class="w-full justify-center sm:w-auto" href="{{ route('dashboard.order-invites') }}" wire:navigate text="View Invites" />
         </x-theme::alert.primary>
     </div>
     @endif
 
     @foreach(auth()->user()->orders()->where('status', 'active')->whereNotNull('due_date')->where('due_date', '<', now()->addDays(5))->get() as $order)
         <div>
-            <x-theme::alert.warning class="flex items-center justify-between">
-            <span>Order {{ $order->package->name }} (#{{ $order->id }}) is due in {{ $order->due_date->diffForHumans() }}, please renew it in time to avoid suspension.</span>
-                <x-theme::button.primary href="{{ route('orders.view', $order->id) }}" wire:navigate text="View Order"/>
+            <x-theme::alert.warning class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span class="min-w-0">Order {{ $order->package->name }} (#{{ $order->id }}) is due in {{ $order->due_date->diffForHumans() }}, please renew it in time to avoid suspension.</span>
+                <x-theme::button.primary class="w-full shrink-0 justify-center sm:w-auto" href="{{ route('orders.view', $order->id) }}" wire:navigate text="View Order"/>
             </x-theme::alert.warning>
         </div>
     @endforeach
 
     @foreach(auth()->user()->orders()->where('status', 'suspended')->get() as $order)
         <div>
-            <x-theme::alert.danger class="flex items-center justify-between">
-            <span>Order {{ $order->package->name }} (#{{ $order->id }}) is suspended, please renew it in time to avoid termination.</span>
-                <x-theme::button.primary href="{{ route('orders.view', $order->id) }}" wire:navigate text="View Order"/>
+            <x-theme::alert.danger class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span class="min-w-0">Order {{ $order->package->name }} (#{{ $order->id }}) is suspended, please renew it in time to avoid termination.</span>
+                <x-theme::button.primary class="w-full shrink-0 justify-center sm:w-auto" href="{{ route('orders.view', $order->id) }}" wire:navigate text="View Order"/>
             </x-theme::alert.danger>
         </div>
     @endforeach

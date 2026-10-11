@@ -101,14 +101,14 @@ new class extends Component {
 ?>
 
 <section>
-    <div class="mx-auto max-w-screen-xl px-4 2xl:px-0">
+    <div class="mx-auto max-w-screen-xl px-0 sm:px-4 2xl:px-0">
 
-        <div class="mb-4 flex items-end">
-            <img class="w-16 h-16 rounded-sm mr-3" src="{{ $package->icon() }}" alt="Large avatar">
+        <div class="mb-4 flex items-start gap-3">
+            <img class="h-14 w-14 shrink-0 rounded-sm sm:h-16 sm:w-16" src="{{ $package->icon() }}" alt="Large avatar">
 
-            <div>
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">{{ $package->name }}</h2>
-                <p class="text-lg text-gray-500 lg:mb-0 dark:text-gray-400 lg:max-w-2xl">{{ $package->short_description }}</p>
+            <div class="min-w-0">
+                <h2 class="break-words text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">{{ $package->name }}</h2>
+                <p class="break-words text-base text-gray-500 dark:text-gray-400 sm:text-lg lg:mb-0 lg:max-w-2xl">{{ $package->short_description }}</p>
             </div>
         </div>
 
@@ -131,7 +131,7 @@ new class extends Component {
                     <ul class="grid w-full gap-6 md:grid-cols-3">
 
                         @foreach($package->prices as $price)
-                            <li class="col-span-3 lg:col-span-1 md:col-span-1">
+                            <li>
                                 <input type="radio" wire:model.live="packagePriceId"
                                        id="package_price_id{{ $price->id }}" value="{{ $price->id }}"
                                        class="hidden peer" required/>
@@ -246,9 +246,9 @@ new class extends Component {
                             @endif
                         </div>
 
-                        <dl class="flex items-center justify-between gap-4 border-t border-gray-200 pt-2 dark:border-gray-700">
-                            <dt class="text-base font-bold text-gray-900 dark:text-white">Total</dt>
-                            <dd class="text-base font-bold text-gray-900 dark:text-white">{{ price($this->calculateConfigOptionCost()['total'] + $this->packagePrice->price) }} / {{ $this->packagePrice->cycle() }} @if($this->packagePrice->setup_fee > 0) (+ {{ price($this->packagePrice->setup_fee) }} Setup Fee) @endif</dd>
+                            <dl class="flex items-start justify-between gap-4 border-t border-gray-200 pt-2 dark:border-gray-700">
+                            <dt class="shrink-0 text-base font-bold text-gray-900 dark:text-white">Total</dt>
+                            <dd class="min-w-0 text-right text-base font-bold text-gray-900 dark:text-white">{{ price($this->calculateConfigOptionCost()['total'] + $this->packagePrice->price) }} / {{ $this->packagePrice->cycle() }} @if($this->packagePrice->setup_fee > 0) (+ {{ price($this->packagePrice->setup_fee) }} Setup Fee) @endif</dd>
                         </dl>
                     </div>
 

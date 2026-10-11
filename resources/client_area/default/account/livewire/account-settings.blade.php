@@ -9,13 +9,12 @@ new class extends Component
 ?>
 
 
-<div class="grid grid-cols-1 px-4 pt-6 dark:bg-gray-900 xl:grid-cols-3 xl:gap-4">
+<div class="grid grid-cols-1 gap-4 pt-2 dark:bg-gray-900 xl:grid-cols-3 xl:gap-4">
 
     <!-- Right Content -->
-    <div class="col-span-full xl:col-auto">
+    <div class="min-w-0 xl:col-auto">
         <div class="mb-4 rounded-lg bg-white p-4 shadow dark:bg-gray-800 sm:p-6 xl:p-8">
-            <div class="items-center sm:flex sm:space-x-4 xl:block xl:space-x-0 2xl:flex 2xl:space-x-4"
-                 style="display: flex;justify-content: space-evenly;">
+            <div class="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-start">
                 @if (auth()->user()->avatar !== null)
                     <img class="mb-4 h-20 w-20 rounded-lg sm:mb-0 xl:mb-4 2xl:mb-0" src="{{ auth()->user()->getAvatarUrl() }}" alt="user photo">
                 @else
@@ -80,7 +79,7 @@ new class extends Component
 
         @livewire(client_view_path(('account.livewire.view-sessions')))
     </div>
-    <div class="col-span-2">
+    <div class="min-w-0 xl:col-span-2">
         @livewire(client_view_path(('account.livewire.general-settings')))
 
         @livewire(client_view_path(('account.livewire.update-address')))

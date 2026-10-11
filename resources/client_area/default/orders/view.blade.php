@@ -26,22 +26,22 @@
 
     @if($order->isActive() && !$order->hasActiveSubscription() && $order->isRecurring() && !$order->auto_balance_renew && \App\Models\GatewayConfig::where('type', 'subscription')->where('is_active', true)->count() > 0 && \App\Support\LicensePlanLimits::subscriptionsEnabled())
         <div>
-            <x-theme::alert.primary class="flex items-center justify-between">
-            <span>
+            <x-theme::alert.primary class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span class="min-w-0">
                 Setup a subscription to automatically renew this order and never miss a payment.
             </span>
-                <x-theme::button.primary href="{{ route('orders.view.subscription', $order->id) }}" wire:navigate text="Setup Subscription" />
+                <x-theme::button.primary class="w-full shrink-0 justify-center sm:w-auto" href="{{ route('orders.view.subscription', $order->id) }}" wire:navigate text="Setup Subscription" />
             </x-theme::alert.primary>
         </div>
     @endif
 
     @if($activeSubscription = $order->hasActiveSubscription())
         <div>
-            <x-theme::alert.primary class="flex items-center justify-between">
-        <span>
+            <x-theme::alert.primary class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <span class="min-w-0">
                 You have an active subscription for this order. The next billing date is {{ $activeSubscription->subscription ? $activeSubscription->subscription->next_billing_at->format('d M Y') : 'N/A' }}.
         </span>
-                <x-theme::button.primary href="{{ route('orders.view.subscription', $order->id) }}" wire:navigate text="View Subscription" />
+                <x-theme::button.primary class="w-full shrink-0 justify-center sm:w-auto" href="{{ route('orders.view.subscription', $order->id) }}" wire:navigate text="View Subscription" />
             </x-theme::alert.primary>
         </div>
     @endif
@@ -101,7 +101,7 @@
                 @endif
             </x-theme::datagrid.item>
         </x-theme::datagrid.grid>
-        <x-theme::button.success type="button" data-drawer-target="renew-order-drawer" data-drawer-show="renew-order-drawer" data-drawer-placement="right" aria-controls="renew-order-drawer" text="Renew" />
+        <x-theme::button.success class="w-full sm:w-auto" type="button" data-drawer-target="renew-order-drawer" data-drawer-show="renew-order-drawer" data-drawer-placement="right" aria-controls="renew-order-drawer" text="Renew" />
     </x-theme::card>
 
     @livewire(client_view_path('orders.livewire.server-account-block'), ['order_id' => $order->id])

@@ -35,7 +35,7 @@ new class extends Component
 ?>
 
 <section class="bg-gray-50 py-4 antialiased dark:bg-gray-900 md:py-4">
-    <div class="mx-auto max-w-screen-xl px-4 2xl:px-0">
+    <div class="mx-auto max-w-screen-xl px-0 sm:px-4 2xl:px-0">
         <!-- Heading & Filters -->
         <div class="mb-4 items-end justify-between space-y-4 sm:flex sm:space-y-0 md:mb-8">
             <div>
@@ -50,8 +50,8 @@ new class extends Component
             <div class="flex flex-col p-6 col-span-6 md:col-span-3 lg:col-span-2 mx-auto max-w-lg text-center text-gray-900 bg-white rounded-lg border border-gray-200 shadow-sm dark:border-gray-700 xl:p-8 dark:text-white dark:bg-gray-800">
                 <h3 class="mb-4 text-2xl font-semibold">{{ $package->name }}</h3>
                 <p class="text-gray-500 text-light sm:text-lg dark:text-gray-400">{{ Str::limit($package->short_description, 70) }}</p>
-                <div class="flex justify-center items-baseline my-8">
-                    <span class="mr-2 text-5xl font-extrabold">{{ price($package->prices->first()->price) }}</span>
+                <div class="my-8 flex flex-wrap items-baseline justify-center gap-x-2">
+                    <span class="text-4xl font-extrabold sm:text-5xl">{{ price($package->prices->first()->price) }}</span>
                     <span class="text-gray-500">/{{ $package->prices->first()->cycle() }}</span>
                 </div>
                 <!-- List -->

@@ -21,7 +21,7 @@ new class extends Component
 ?>
 
 <div>
-    <button type="button" data-dropdown-toggle="language-dropdown-menu" class="inline-flex items-center font-medium justify-center px-4 py-2 text-sm text-gray-900 dark:text-white rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-white">
+    <button type="button" data-dropdown-toggle="language-dropdown-menu" class="inline-flex h-10 cursor-pointer items-center justify-center rounded-lg px-2 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white sm:px-3">
         {{ session('currency', settings('currency', 'USD')) }}
     </button>
     <!-- Dropdown -->

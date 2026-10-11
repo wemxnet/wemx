@@ -62,15 +62,15 @@ new class extends Component
                 <div class="w-full flex items-center space-x-3">
                     <h5 class="dark:text-white font-semibold">Orders</h5>
                 </div>
-                <div class="w-full flex flex-row items-center justify-end space-x-3">
-                    <a href="{{ route('categories.index') }}" wire:navigate class="w-full md:w-auto flex items-center justify-center text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-3 py-2 dark:bg-primary-600 dark:hover:bg-primary-700 focus:outline-none dark:focus:ring-primary-800">
+                <div class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                    <a href="{{ route('categories.index') }}" wire:navigate class="flex w-full items-center justify-center rounded-lg bg-primary-700 px-3 py-2 text-sm font-medium text-white hover:bg-primary-800 focus:outline-none focus:ring-4 focus:ring-primary-300 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800 sm:w-auto">
                         <svg class="h-3.5 w-3.5 mr-2" fill="currentColor" viewbox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                             <path clip-rule="evenodd" fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
                         </svg>
                         New Order
                     </a>
 
-                    <button id="filterDropdownButton" data-dropdown-toggle="filterDropdown" class="w-full md:w-auto flex items-center justify-center py-2 px-4 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-primary-700 focus:z-10 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700" type="button">
+                    <button id="filterDropdownButton" data-dropdown-toggle="filterDropdown" class="flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 hover:text-primary-700 focus:z-10 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white dark:focus:ring-gray-700 sm:w-auto" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="h-4 w-4 mr-2 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd"></path>
                         </svg>
@@ -90,7 +90,7 @@ new class extends Component
                             @endforeach
                         </ul>
                     </div>
-                    <div class="flex items-center">
+                    <div class="flex w-full items-center sm:max-w-xs sm:flex-1">
                         <label for="order-search" class="sr-only">Search</label>
                         <div class="relative w-full">
                             <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -111,10 +111,10 @@ new class extends Component
                             <span class="sr-only">Expand/Collapse Row</span>
                         </th>
                         <th scope="col" class="px-4 py-">Product</th>
-                        <th scope="col" class="px-4 py-3">
+                        <th scope="col" class="hidden px-4 py-3 sm:table-cell">
                             Price Cycle
                         </th>
-                        <th scope="col" class="px-4 py-3">
+                        <th scope="col" class="hidden px-4 py-3 md:table-cell">
                             Members
                         </th>
                         <th scope="col" class="px-4 py-3">
@@ -123,10 +123,10 @@ new class extends Component
                                 <path clip-rule="evenodd" fill-rule="evenodd" d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z" />
                             </svg>
                         </th>
-                        <th scope="col" class="px-4 py-3">
+                        <th scope="col" class="hidden px-4 py-3 sm:table-cell">
                             Due Date
                         </th>
-                        <th scope="col" class="px-4 py-3">
+                        <th scope="col" class="hidden px-4 py-3 lg:table-cell">
                             Next Payment
                         </th>
                     </tr>
@@ -139,15 +139,18 @@ new class extends Component
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                             </svg>
                         </td>
-                        <th scope="row" class="flex items-center whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-white">
-                            <img class="mr-2 h-9 w-9 rounded" src="{{ $order->package->icon() }}" alt="">
-                            <span class="flex flex-col"> {{ $order->package->name }}
-                                <small class="text-gray-500 dark:text-gray-400">
+                        <th scope="row" class="px-3 py-3 font-medium text-gray-900 dark:text-white sm:px-4">
+                            <div class="flex min-w-0 items-center gap-2">
+                                <img class="h-9 w-9 shrink-0 rounded" src="{{ $order->package->icon() }}" alt="">
+                                <span class="flex min-w-0 flex-col">
+                                    <span class="truncate">{{ $order->package->name }}</span>
+                                    <small class="truncate text-gray-500 dark:text-gray-400">
                                         {{ $order->package->category->name }}
-                                </small>
-                            </span>
+                                    </small>
+                                </span>
+                            </div>
                         </th>
-                        <td class="px-4 py-3">
+                        <td class="hidden px-4 py-3 sm:table-cell">
                             <div class="flex items-center text-gray-500 dark:text-gray-400">
                         <span class="mr-1 font-bold text-gray-500 dark:text-white">
                             {{ price($order->price) }}
@@ -155,7 +158,7 @@ new class extends Component
                                 / {{ $order->cycle() }}
                             </div>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="hidden px-4 py-3 md:table-cell">
                             <div class="relative mt-0.5 inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-gray-500 bg-gray-100 dark:bg-gray-600">
                                 <span class="font-medium text-gray-600 dark:text-gray-300">Mu</span>
                             </div>
@@ -175,14 +178,14 @@ new class extends Component
                                 <x-theme::badge.warning text="{{ ucfirst($order->status) }}" />
                             @endif
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="hidden px-4 py-3 sm:table-cell">
                             @if($order->due_date)
                                 {{ $order->due_date->format('d M Y') }}
                             @else
                                 Never
                             @endif
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="hidden px-4 py-3 lg:table-cell">
                             @if($order->due_date)
                                 {{ $order->due_date }}
                             @else

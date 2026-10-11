@@ -52,7 +52,7 @@ new class extends Component {
 
     <div
         id="cartDropdown1"
-        class="z-10 mx-auto w-[360px] space-y-4 overflow-hidden rounded-lg bg-white p-4 antialiased shadow-lg dark:bg-gray-700 hidden"
+        class="z-10 mx-auto hidden w-[min(22.5rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] space-y-4 overflow-hidden rounded-lg bg-white p-4 antialiased shadow-lg dark:bg-gray-700"
         data-popper-placement="bottom"
         style="position: absolute; inset: 0px auto auto 0px; margin: 0px; transform: translate(804px, 64px);"
     >

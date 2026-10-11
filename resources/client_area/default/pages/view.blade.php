@@ -5,7 +5,7 @@
 @section('title', $page->title)
 
 @section('content')
-    <div class="mx-auto max-w-screen-xl px-4 2xl:px-0">
+    <div class="mx-auto max-w-screen-xl px-0 sm:px-4 2xl:px-0">
         <div class="row">
             <div class="col-12">
                 <div class="card">

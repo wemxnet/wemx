@@ -1,3 +1,3 @@
-<th scope="row" {{ $attributes->merge(['class' => 'px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white']) }}>
+<th scope="row" {{ $attributes->merge(['class' => 'px-3 py-3 font-medium text-gray-900 dark:text-white sm:px-6 sm:py-4']) }}>
     {{ $slot }}
 </th>

@@ -23,7 +23,7 @@
         };
     @endphp
 
-    <div class="mx-auto max-w-screen-xl px-4 2xl:px-0">
+    <div class="mx-auto max-w-screen-xl px-0 sm:px-4 2xl:px-0">
         <div class="sm:flex sm:items-center sm:justify-between sm:gap-4">
             <h2 class="mt-3 text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">Categories</h2>
         </div>
@@ -50,7 +50,7 @@
     @if(request()->has('category') && $canViewRequestedCategory)
         @livewire(client_view_path('categories.livewire.product-list'), ['category' => request()->get('category')])
     @elseif(request()->has('category') && ! $canViewRequestedCategory)
-        <div class="mx-auto max-w-screen-xl px-4 2xl:px-0 mt-4">
+        <div class="mx-auto max-w-screen-xl px-0 sm:px-4 2xl:px-0 mt-4">
             <x-theme::alert.warning text="This category is not available." />
         </div>
     @endif

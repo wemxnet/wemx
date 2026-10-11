@@ -101,13 +101,13 @@ new class extends Component
 <div>
     <x-theme::table containerClass="shadow-md sm:rounded-t-lg" >
         <x-theme::table.caption :description="$description">
-            <div class="flex flex-column justify-between items-center">
-                <div>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
                     {{ $title }}
                 </div>
 
                 @if($searchable)
-                    <div class="flex justify-between items-center space-x-3">
+                    <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
                         @if(!empty($actionButton))
                             <x-theme::button.primary
                                 href="{{ $actionButton['href'] }}"
@@ -115,7 +115,7 @@ new class extends Component
                             />
                         @endif
 
-                        <div class="flex items-center">
+                        <div class="flex w-full items-center sm:w-64">
                             <label for="order-search" class="sr-only">Search</label>
                             <div class="relative w-full">
                                 <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -167,7 +167,7 @@ new class extends Component
     <div class="relative overflow-hidden bg-white rounded-b-lg shadow-md dark:bg-gray-800">
         <nav class="flex flex-col items-start justify-between p-4 space-y-3 md:flex-row md:items-center md:space-y-0"
              aria-label="Table navigation">
-            <div class="flex items-center space-x-3">
+            <div class="flex flex-wrap items-center gap-3">
                 <label for="rows" class="text-sm font-normal text-gray-500 dark:text-gray-400">
                     Rows per page
                 </label>

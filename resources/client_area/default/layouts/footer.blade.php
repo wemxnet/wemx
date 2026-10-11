@@ -1,9 +1,9 @@
 <footer class="mt-auto w-full border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
     <div class="w-full max-w-screen-xl mx-auto p-4 md:py-8">
         <div class="sm:flex sm:items-center sm:justify-between">
-            <a href="/" class="flex items-center mb-4 sm:mb-0 space-x-3 rtl:space-x-reverse" wire:navigate>
-                <img src="{{ settings('app_logo', '/assets/common/img/app-logo.png') }}" class="h-7 rounded" alt="{{ settings('app_name', 'WemX') }} Logo" />
-                <span class="self-center whitespace-nowrap text-2xl font-semibold text-gray-900 dark:text-white">{{ settings('app_name', 'WemX') }}</span>
+            <a href="/" class="mb-4 flex min-w-0 items-center gap-3 sm:mb-0" wire:navigate>
+                <img src="{{ settings('app_logo', '/assets/common/img/app-logo.png') }}" class="h-7 shrink-0 rounded" alt="{{ settings('app_name', 'WemX') }} Logo" />
+                <span class="truncate text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">{{ settings('app_name', 'WemX') }}</span>
             </a>
             <ul class="mb-6 flex flex-wrap items-center text-sm font-medium text-gray-500 dark:text-gray-400 sm:mb-0">
                 @foreach(extensionElements(['footer-item']) as $element)

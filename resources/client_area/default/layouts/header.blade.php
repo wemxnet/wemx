@@ -6,12 +6,12 @@
     <nav
         class="bg-white border-b border-gray-200 px-4 py-2.5 dark:bg-gray-800 dark:border-gray-700"
     >
-        <div class="flex flex-wrap justify-between items-center">
-            <div class="flex justify-start items-center gap-2 min-w-0">
+        <div class="flex flex-nowrap items-center justify-between gap-2">
+            <div class="flex min-w-0 items-center gap-1 sm:gap-2">
                 <button
                     type="button"
                     id="client-nav-toggle"
-                    class="inline-flex items-center justify-center p-2 text-sm text-gray-500 rounded-lg lg:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600 shrink-0"
+                    class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg p-2 text-sm text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 lg:hidden dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
                     aria-controls="client-main-navigation"
                     aria-expanded="false"
                     data-collapse-toggle="client-main-navigation"
@@ -21,20 +21,17 @@
                         <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 1h15M1 7h15M1 13h15"/>
                     </svg>
                 </button>
-                <a href="/" class="flex mr-4 min-w-0 items-center">
+                <a href="/" class="flex min-w-0 items-center">
                     <img
                         src="{{ settings('app_logo', '/assets/common/img/app-logo.png') }}"
-                        class="mr-2 h-10 shrink-0 rounded"
+                        class="h-8 w-8 shrink-0 rounded sm:mr-2 sm:h-10 sm:w-auto"
                         alt="Application Logo"
                     />
-                    <span
-                        class="text-xl font-semibold truncate dark:text-white sm:text-2xl"
-                    >{{ settings('app_name', 'Application') }}</span
-                    >
+                    <span class="hidden truncate text-lg font-semibold dark:text-white sm:inline sm:text-2xl">{{ settings('app_name', 'Application') }}</span>
                 </a>
             </div>
-            <div class="flex items-center lg:order-2">
-                <button data-tooltip-target="tooltip-dark" type="button" onclick="toggleDarkmode()" class="inline-flex items-center p-2 mr-1 text-sm font-medium text-gray-500 rounded-lg dark:text-gray-400 hover:bg-gray-50 focus:ring-4 focus:ring-gray-300 dark:hover:bg-gray-700 focus:outline-none dark:focus:ring-gray-800">
+            <div class="flex shrink-0 items-center lg:order-2">
+                <button data-tooltip-target="tooltip-dark" type="button" onclick="toggleDarkmode()" class="inline-flex h-10 w-10 items-center justify-center rounded-lg p-2 text-sm font-medium text-gray-500 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-800">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                         <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
                     </svg>
@@ -43,7 +40,7 @@
                 @livewire(client_view_path('livewire.widgets.currency-dropdown'))
                 <span class="hidden mx-2 w-px h-5 bg-gray-200 dark:bg-gray-600 lg:inline"></span>
                 @auth
-                <a href="{{ route('dashboard.email-inbox') }}" class="inline-flex items-center p-2 mr-1 text-sm font-medium text-gray-500 rounded-lg dark:text-gray-400 hover:bg-gray-50 focus:ring-4 focus:ring-gray-300 dark:hover:bg-gray-700 focus:outline-none dark:focus:ring-gray-800 @if(request()->routeIs('dashboard.email-inbox')) bg-gray-100 dark:bg-gray-700 @endif" data-tooltip-target="tooltip-email" wire:navigate>
+                <a href="{{ route('dashboard.email-inbox') }}" class="inline-flex h-10 w-10 items-center justify-center rounded-lg p-2 text-sm font-medium text-gray-500 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-300 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-800 @if(request()->routeIs('dashboard.email-inbox')) bg-gray-100 dark:bg-gray-700 @endif" data-tooltip-target="tooltip-email" wire:navigate>
                     <div class="relative">
                         <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M2.038 5.61A2.01 2.01 0 0 0 2 6v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6c0-.12-.01-.238-.03-.352l-.866.65-7.89 6.032a2 2 0 0 1-2.429 0L2.884 6.288l-.846-.677Z"/>
@@ -60,7 +57,7 @@
                 @auth
                 <button
                     type="button"
-                    class="flex mx-3 text-sm bg-gray-800 rounded-full md:mr-0 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
+                    class="mx-1 flex rounded-full bg-gray-800 text-sm focus:ring-4 focus:ring-gray-300 sm:mx-2 md:mr-0 dark:focus:ring-gray-600"
                     id="user-menu-button"
                     aria-expanded="false"
                     data-dropdown-toggle="dropdown"
@@ -157,10 +154,10 @@
                 </div>
                 @endauth
                 @guest
-                <div>
-                    <a href="{{ route('login') }}" class="mr-2 rounded-lg px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-300 dark:text-white dark:hover:bg-gray-700 dark:focus:ring-gray-800 lg:py-2.5">Login</a>
+                <div class="hidden items-center gap-1 min-[380px]:flex">
+                    <a href="{{ route('login') }}" class="rounded-lg px-2.5 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-300 dark:text-white dark:hover:bg-gray-700 dark:focus:ring-gray-800 sm:px-4 lg:py-2.5">Login</a>
                     @if(settings('enable_registrations', true))
-                        <a href="{{ route('register') }}" class="bg-primary-700 hover:bg-primary-800 focus:ring-primary-300 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800 mr-2 rounded-lg px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-4 lg:py-2.5">Sign up</a>
+                        <a href="{{ route('register') }}" class="bg-primary-700 hover:bg-primary-800 focus:ring-primary-300 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800 rounded-lg px-2.5 py-2 text-sm font-medium text-white focus:outline-none focus:ring-4 sm:px-4 lg:py-2.5">Sign up</a>
                     @endif
                 </div>
                 @endguest
@@ -171,62 +168,64 @@
 
 @if(session('impersonate'))
     <div>
-        <x-theme::alert.warning class="flex items-center justify-between" style="margin-bottom: 0px;">
-            <span>
+        <x-theme::alert.warning class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between" style="margin-bottom: 0px;">
+            <span class="min-w-0">
                 You are currently logged in as {{ auth()->user()->username }} ({{ Str::mask(auth()->user()->email, '*', 3, strpos(auth()->user()->email, '@') - 3) }}).
             </span>
-            <x-theme::button.primary href="{{ route('admin.users.exit-impersonate') }}" text="Exit"/>
+            <x-theme::button.primary class="w-full justify-center sm:w-auto" href="{{ route('admin.users.exit-impersonate') }}" text="Exit"/>
         </x-theme::alert.warning>
     </div>
 @endif
 
-<div class="bg-gray-50 dark:bg-gray-900 lg:border-b lg:border-gray-200 dark:lg:border-gray-800">
+@php
+    $clientNavLink = function (bool $active): string {
+        $base = 'block rounded-lg px-3 py-2.5 lg:rounded-none lg:bg-transparent lg:px-4 lg:py-3';
+
+        if ($active) {
+            return $base.' bg-white font-medium text-primary-700 dark:bg-gray-800 dark:text-primary-400 lg:border-b-2 lg:border-primary-600';
+        }
+
+        return $base.' text-gray-700 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-800 lg:text-gray-500 lg:hover:border-b-2 lg:hover:border-primary-600 lg:hover:text-primary-600 dark:lg:text-gray-400 dark:lg:hover:border-primary-500 dark:lg:hover:text-primary-500';
+    };
+@endphp
+
+<div class="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
     <div
         id="client-main-navigation"
-        class="hidden w-full border-t border-gray-200 dark:border-gray-700 lg:flex lg:flex-row lg:items-center lg:justify-center lg:border-t-0 lg:py-5"
+        class="hidden w-full border-t border-gray-200 px-2 py-2 dark:border-gray-700 lg:flex lg:flex-row lg:items-center lg:justify-center lg:border-t-0 lg:px-4 lg:py-3"
     >
         <nav
-            class="w-full bg-gray-50 dark:bg-gray-900 lg:bg-transparent"
+            class="w-full lg:bg-transparent"
             aria-label="Main navigation"
         >
-            <ul
-                class="mt-0 flex w-full flex-col text-sm font-medium lg:flex-row lg:flex-wrap lg:justify-center"
-            >
-                <li
-                    class="block border-b dark:border-gray-700 lg:inline lg:border-b-0"
-                >
-                    <a
-                        href="/"
-                        wire:navigate
-                        class="block py-3 px-4 @if($activePage == 'dashboard') border-b-2 text-primary-600 hover:text-primary-600 dark:text-primary-500 dark:border-primary-500 border-primary-600 @else text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:border-b-2 dark:hover:text-primary-500 dark:hover:border-primary-500 hover:border-primary-600 @endif"
-                    >
+            <ul class="flex w-full flex-col gap-1 text-sm font-medium lg:flex-row lg:flex-wrap lg:justify-center lg:gap-1">
+                <li>
+                    <a href="/" wire:navigate class="{{ $clientNavLink($activePage == 'dashboard') }}">
                         Dashboard
                     </a>
                 </li>
-                <li
-                    class="block border-b dark:border-gray-700 lg:inline lg:border-b-0"
-                >
-                    <a
-                        href="{{ route('categories.index') }}"
-                        wire:navigate
-                        class="block py-3 px-4 @if($activePage == 'categories') border-b-2 text-primary-600 hover:text-primary-600 dark:text-primary-500 dark:border-primary-500 border-primary-600 @else text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:border-b-2 dark:hover:text-primary-500 dark:hover:border-primary-500 hover:border-primary-600 @endif"
-                        aria-current="page"
-                    >
+                <li>
+                    <a href="{{ route('categories.index') }}" wire:navigate class="{{ $clientNavLink($activePage == 'categories') }}" @if($activePage == 'categories') aria-current="page" @endif>
                         Categories
                     </a>
                 </li>
                 @foreach(extensionElements(['navigation-item']) as $element)
-                    <li
-                        class="block border-b dark:border-gray-700 lg:inline lg:border-b-0"
-                    >
-                        <a
-                            href="{{ $element['attributes']['href'] ?? '#' }}" wire:navigate
-                            class="block py-3 px-4 @if($activePage == $element['attributes']['active']) border-b-2 text-primary-600 hover:text-primary-600 dark:text-primary-500 dark:border-primary-500 border-primary-600 @else text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:border-b-2 dark:hover:text-primary-500 dark:hover:border-primary-500 hover:border-primary-600 @endif"
-                        >
+                    <li>
+                        <a href="{{ $element['attributes']['href'] ?? '#' }}" wire:navigate class="{{ $clientNavLink($activePage == ($element['attributes']['active'] ?? null)) }}">
                             {{ $element['attributes']['name'] ?? 'undefined' }}
                         </a>
                     </li>
                 @endforeach
+                @guest
+                    <li class="mt-1 border-t border-gray-200 pt-1 dark:border-gray-700 min-[380px]:hidden lg:hidden">
+                        <a href="{{ route('login') }}" class="{{ $clientNavLink(false) }}">Login</a>
+                    </li>
+                    @if(settings('enable_registrations', true))
+                        <li class="min-[380px]:hidden lg:hidden">
+                            <a href="{{ route('register') }}" class="{{ $clientNavLink(false) }}">Sign up</a>
+                        </li>
+                    @endif
+                @endguest
             </ul>
         </nav>
     </div>
