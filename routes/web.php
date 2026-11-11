@@ -31,6 +31,11 @@ Route::middleware(['web'])->group(function () {
     Route::get('/payments/subscribe/{gateway}/{subscription:token}', [Client\PaymentsController::class, 'subscribe'])->name('payments.subscribe');
     Route::any('/gateways/webhooks/{webhook_id}', [Client\PaymentsController::class, 'gatewayWebhook'])->name('payments.gateway.webhook');
     Route::any('/gateways/callbacks/{webhook_id}', [Client\PaymentsController::class, 'gatewayCallback'])->name('payments.gateway.callback');
+
+    // Paddle's "default payment link": Paddle redirects here with ?_ptxn={transaction_id}
+    // appended, and Paddle.js (loaded on this page) opens its checkout overlay so the
+    // customer can actually enter payment details.
+    Route::get('/payments/paddle/checkout', [Client\PaymentsController::class, 'paddleCheckout'])->name('payments.paddle.checkout');
 });
 
 /*

@@ -48,6 +48,8 @@ yarn-error.log
 !/extensions/Gateways/SandboxSubscription/**
 !/extensions/Gateways/StripeCheckout/
 !/extensions/Gateways/StripeCheckout/**
+!/extensions/Gateways/PaddleCheckout/
+!/extensions/Gateways/PaddleCheckout/**
 
 !/extensions/Servers/Universal/
 !/extensions/Servers/Universal/**
